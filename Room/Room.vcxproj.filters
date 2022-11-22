@@ -33,6 +33,9 @@
     <None Include="ikpMP3.dll">
       <Filter>Файлы ресурсов\Libs</Filter>
     </None>
+    <None Include="irrKlang.dll">
+      <Filter>Файлы ресурсов\Libs</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h">
