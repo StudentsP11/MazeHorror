@@ -15,7 +15,63 @@
 using namespace irrklang;
 #define rha right_hand_angle
 
-bool wall_collision(double player_x, double player_y);
+
+
+struct Point2D {
+	double x = 5;
+	double y = 5;
+};
+
+struct coordinates {
+	double X, Y;
+	double dx;
+	double dy;
+	double dS = 0.2;
+	double dA = 5;
+	double rotation_angle = 0;
+};
+
+struct Entity {
+	Point2D player;
+	coordinates P_coordinates;
+};
+
+void MoveLeft(Entity& entity) {
+	entity.P_coordinates.rotation_angle -= entity.P_coordinates.dA;
+
+}
+
+
+void MoveRight(Entity& entity) {
+	entity.P_coordinates.rotation_angle += entity.P_coordinates.dA;
+}
+
+
+void MoveUp(Entity& entity) {
+	entity.player.x -= entity.P_coordinates.dx;
+	entity.player.y -= entity.P_coordinates.dy;
+}
+
+
+void MoveDown(Entity& entity) {
+	entity.player.x += entity.P_coordinates.dx;
+	entity.player.y += entity.P_coordinates.dy;
+
+}
+
+enum Direction {
+	down = 's',
+	up = 'w',
+	right = 'd',
+	left = 'a'
+};
+
+
+
+bool wall_collision(Entity& entity) {
+	
+};
+
 
 struct Maniac {
 	double x, y, rot_angle, right_hand_angle, dx, dy, point_x, point_y;
@@ -29,8 +85,8 @@ double mapwidth = 22;
 double mapheight = 19;
 double wallwidth = 1;
 double wallheight = 3;
-double player_x = 5;
-double player_y = 5;
+//double x = 5;
+//double y = 5;
 double pi = acos(0) * 2;
 double dA = 5;
 double dS = 0.2;
@@ -95,14 +151,15 @@ double* is_wall_on_way(Maniac maniac)
 }
 
 bool sees(Maniac maniac)
-{
-	double y = player_y - maniac.y;
-	double x = player_x - maniac.x;
+{	
+	Entity entity;
+	double y = entity.player.y - maniac.y;
+	double x = entity.player.x - maniac.x;
 	double tg = y / x;
-	for (double X = std::min(maniac.x, player_x); X < std::max(maniac.x, player_x); X += 0.5)
+	for (double X = std::min(maniac.x, entity.player.x); X < std::max(maniac.x, entity.player.x); X += 0.5)
 	{
-		double Y = maniac.y + tg * (X - std::min(maniac.x, player_x));
-		if (wall_collision(X, Y))
+		double Y = maniac.y + tg * (X - std::min(maniac.x, entity.player.x));
+		if (wall_collision(entity))
 			return false;
 	}
 	return true;
@@ -606,12 +663,12 @@ void DrawCube(int x, int y, bool roof, bool floor, double shade)
 	}*/
 }
 
-double degrees_to_radians(double angle)
+double degrees_to_radians(Entity &entity)
 {
-	return angle / 180 * pi;
+	return entity.P_coordinates.rotation_angle / 180 * pi;
 }
 
-bool wall_collision(double player_x, double player_y)
+bool wall_collision(Entity& entity)
 {
 	for (int x = 0; x < mapwidth; x++)
 	{
@@ -620,8 +677,8 @@ bool wall_collision(double player_x, double player_y)
 			char cell = field[y][x];
 			if (cell == '#')
 			{
-				double Sx = (x - player_x) * wallwidth;
-				double Sy = (y - player_y) * wallwidth;
+				double Sx = (x - entity.player.x) * wallwidth;
+				double Sy = (y - entity.player.y) * wallwidth;
 				if (Sx > -wallwidth + 0.2 && Sx < wallwidth - 0.2 && Sy > -wallwidth + 0.2 && Sy < wallwidth - 0.2)
 				{
 					return true;
@@ -633,36 +690,90 @@ bool wall_collision(double player_x, double player_y)
 	return false;
 }
 
+//struct Point2D {
+//	int x = 5;
+//	int y = 5;
+//};
+//
+//struct coordinates {
+//	double dx;
+//	double dy;
+//	double dS = 0.2;
+//	double dA = 5;
+//	double rotation_angle = 0;
+//};
+//
+//struct Entity {
+//	Point2D player;
+//	coordinates P_coordinates;
+//};
+//
+//void MoveLeft(Entity& entity) {
+//	entity.P_coordinates.rotation_angle -= entity.P_coordinates.dA;
+//
+//}
+//
+//
+//void MoveRight(Entity& entity) {
+//	entity.P_coordinates.rotation_angle += entity.P_coordinates.dA;
+//}
+//
+//
+//void MoveUp(Entity& entity) {
+//	entity.player.x -= entity.P_coordinates.dx;
+//	entity.player.y -= entity.P_coordinates.dy;
+//}
+//
+//
+//void MoveDown(Entity& entity) {
+//	entity.player.x += entity.P_coordinates.dx;
+//	entity.player.y += entity.P_coordinates.dy;
+//
+//}
+//
+//enum Direction {
+//	down = 's',
+//	up = 'w',
+//	right = 'd',
+//	left = 'a'
+//};
+
+
+
 void motion(unsigned char key, int x, int y)
 {
-	double alpha = degrees_to_radians(rotation_angle);
-	double dx = sin(alpha) * dS;
-	double dy = cos(alpha) * dS;
-	if (key == 'a') rotation_angle -= dA;
-	else if (key == 'd') rotation_angle += dA;
-	if (key == 'w') {
-		player_y -= dx;
-		player_x -= dy;
-	}
-	else if (key == 's') {
-		player_y += dx;
-		player_x += dy;
-	}
+	Entity entity;
+	double alpha = degrees_to_radians(entity);
+	entity.P_coordinates.dx = sin(alpha) * (entity.P_coordinates.dS);
+	entity.P_coordinates.dy = cos(alpha) * (entity.P_coordinates.dS);
 
-	if (wall_collision(player_x, player_y))
+	switch (key)
 	{
-		if (key == 'w')
+	case Direction::left:
+		MoveLeft(entity);
+	case Direction::right:
+		MoveRight(entity);
+	case Direction::up:
+		MoveUp(entity);
+		break;
+	case Direction::down:
+		MoveDown(entity);
+		break;
+
+
+		if (wall_collision(entity))
 		{
-			player_y += dx;
-			player_x += dy;
-		}
-		else if (key == 's') {
-			player_y -= dx;
-			player_x -= dy;
+			if (key == 'w')
+			{
+				MoveDown(entity);
+			}
+			else if (key == 's') {
+				MoveUp(entity);
+			}
 		}
 	}
-}
 
+}
 int main(int argc, char** argv) {
 	srand(time(NULL));
 
