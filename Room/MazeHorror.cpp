@@ -12,8 +12,11 @@
 #include <irrKlang.h>
 
 #include "Direction.h"
+#include "Maze.h"
 
 #pragma comment(lib, "irrKlang.lib")
+
+#define DEV
 
 using namespace irrklang;
 #define rha right_hand_angle
@@ -28,12 +31,12 @@ double ManiacDist(Maniac maniac);
 
 double*** current_cube = new double** [6];
 
-double mapwidth = 22;
-double mapheight = 19;
+double mapwidth = 31;
+double mapheight = 31;
 double wallwidth = 1;
 double wallheight = 3;
-double player_x = 5;
-double player_y = 5;
+double player_x = 1;
+double player_y = 8;
 double pi = acos(0) * 2;
 double dA = 5;
 double dS = 0.05;
@@ -107,31 +110,13 @@ double ManiacDist(Maniac maniac)
 	double y = maniac.y - player_y;
 	return sqrt(x * x + y * y);
 }
-const char** field = new const char* [mapheight] {
-		"##########  ##########",
-		"#        #  #        #",
-		"#        ####        #",
-		"#               ######",
-		"#                    #",
-		"#                    #",
-		"######               #",
-		"#        ####        #",
-		"#        #  #        #",
-		"###    ###  ###    ###",
-		"#        #  #        #",
-		"#        ####        #",
-		"######               #",
-		"#                    #",
-		"#                    #",
-		"#               ######",
-		"#        ####        #",
-		"#        #  #        #",
-		"##########  ##########"
-};
+
 struct Point {
 	int x;
 	int y;
 };
+
+char** field = nullptr;
 
 double dist(double pt_x, double pt_y, double X, double Y) {
 	double x = X - pt_x;
@@ -686,19 +671,21 @@ double degrees_to_radians(double angle)
 
 bool wall_collision(double player_x, double player_y)
 {
+	const double collision_border = 0.1;
 	for (int x = 0; x < mapwidth; x++)
 	{
 		for (int y = 0; y < mapheight; y++)
 		{
 			char cell = field[y][x];
-			if (cell == '#')
+			if (cell == Maze::WALL)
 			{
 				double Sx = (x - player_x) * wallwidth;
 				double Sy = (y - player_y) * wallwidth;
-				if (Sx > -wallwidth + 0.2 && Sx < wallwidth - 0.2 && Sy > -wallwidth + 0.2 && Sy < wallwidth - 0.2)
-				{
+				if (Sx > -wallwidth + collision_border
+					&& Sx < wallwidth - collision_border
+					&& Sy > -wallwidth + collision_border
+					&& Sy < wallwidth - collision_border)
 					return true;
-				}
 			}
 		}
 	}
@@ -792,8 +779,42 @@ SDL_Window* InitWindow(const int screen_width, const int screen_height) {
 	return window;
 }
 
+std::pair<size_t, size_t> random_index_2d(size_t height, size_t width)
+{
+	size_t row_index = rand() % height,
+		col_index = rand() % width;
+
+	return { row_index, col_index };
+}
+
+std::pair<size_t, size_t> random_position(Maze maze) {
+	auto position = random_index_2d(maze.height(), maze.width());
+	return { position.first % (maze.height() - 2) + 1,
+		position.first % (maze.height() - 2) + 1};
+}
+
 int SDL_main(int argc, char ** argv) {
+#ifdef DEV
+	srand(1);
+#else
 	srand(time(NULL));
+#endif
+	Maze maze(31, 31);
+
+	field = maze.get_maze_array_unsafe__();
+
+	std::pair<size_t, size_t> player_position;
+
+	do {
+		player_position = random_position(maze);
+	} while (field[player_position.first][player_position.second] == Maze::WALL);
+
+	maze.Print();
+
+	player_y = player_position.first-0.5;
+	player_x = player_position.second+0.5;
+	wallheight = maze.width();
+	wallwidth = maze.height();
 
 	int screen_width = 1280;
 	int screen_height = 960;

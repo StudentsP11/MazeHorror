@@ -153,6 +153,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Direction.cpp" />
+    <ClCompile Include="Maze.cpp" />
     <ClCompile Include="MazeHorror.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -160,6 +161,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Direction.h" />
+    <ClInclude Include="Maze.h" />
     <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
