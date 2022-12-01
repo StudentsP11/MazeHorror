@@ -45,7 +45,7 @@ int count = 0;
 double check_points[6][2] = { {20, 1}, {20, 17}, {1, 7}, {1, 10}, {1, 1}, {1, 20} };
 int chckpntsnum = 6;
 
-Maniac maniac = { 20, 17, 0, 0, 0, 0, 0, 0 };
+Maniac maniac = { 1, 4, 0, 0, 0, 0, 0, 0 };
 
 ISoundEngine* engine = createIrrKlangDevice();
 ISound* sound = engine->play2D("Sounds/scary_sound.mp3", true, true, false, ESM_AUTO_DETECT, true);
@@ -76,7 +76,22 @@ double** RotatePolygon(double** polygon, double verts_amount, double angle, bool
 			new_polygon[i][2] = new_z;
 		}
 	}
+	delete[] polygon;
 	return new_polygon;
+}
+
+double* is_wall_on_way(Maniac maniac)
+{
+	double y = maniac.point_y - maniac.y;
+	double x = maniac.point_x - maniac.x;
+	double tg = y / x;
+	for (double X = std::min(maniac.x, player_x); X < std::max(maniac.x, player_x); X += 0.5)
+	{
+		double Y = maniac.y + tg * (X - std::min(maniac.x, player_x));
+		if (wall_collision(X, Y))
+			return new double[2] {X, Y};
+	}
+	return 0;
 }
 
 bool sees(Maniac maniac)
@@ -93,7 +108,107 @@ bool sees(Maniac maniac)
 	return true;
 }
 
-void MoveManiac(Maniac &maniac)
+double ManiacDist(Maniac maniac)
+{
+	double x = maniac.x - player_x;
+	double y = maniac.y - player_y;
+	return sqrt(x * x + y * y);
+}
+const char** field = new const char* [mapheight] {
+		"##########  ##########",
+		"#        #  #        #",
+		"#        ####        #",
+		"#               ######",
+		"#                    #",
+		"#                    #",
+		"######               #",
+		"#        ####        #",
+		"#        #  #        #",
+		"###    ###  ###    ###",
+		"#        #  #        #",
+		"#        ####        #",
+		"######               #",
+		"#                    #",
+		"#                    #",
+		"#               ######",
+		"#        ####        #",
+		"#        #  #        #",
+		"##########  ##########"
+};
+
+void switch_way(Maniac& maniac, int X, int Y) {
+	if (field[Y + 1][X] == ' ')
+	{
+		if (maniac.dx > 0) {
+			int chosen_way = rand() % 3;
+			if (chosen_way == 0) {
+				while (field[Y][X] != ' ') {
+					X -= 1;
+				}
+			}
+			else {
+				while (field[Y][X] != ' ') {
+					X += 1;
+				}
+			}
+
+		}
+		if (maniac.dx < 0) {
+			int chosen_way = rand() % 3;
+			if (chosen_way == 0) {
+				while (field[Y][X] != ' ') {
+					X += 1;
+				}
+			}
+			else {
+				while (field[Y][X] != ' ') {
+					X -= 1;
+				}
+			}
+		}
+		int sine1 = (Y - maniac.y) / ManiacDist(maniac);
+		int cosine1 = (X - maniac.x) / ManiacDist(maniac);
+		maniac.dx = dS * cosine1 / 5;
+		maniac.dy = 0;
+
+	}
+	else if(field[Y][X + 1] == ' ') {
+		if (maniac.dy > 0) {
+			int chosen_way = rand() % 3;
+			if (chosen_way == 0) {
+				while (field[Y][X] != ' ') {
+					Y -= 1;
+				}
+			}
+			else {
+				while (field[Y][X] != ' ') {
+					Y += 1;
+				}
+			}
+		}
+		else {
+			int chosen_way = rand() % 3;
+			if (chosen_way == 0) {
+				while (field[Y][X] != ' ') {
+					Y += 1;
+				}
+			}
+			else {
+				while (field[Y][X] != ' ') {
+					Y -= 1;
+				}
+			}
+		}
+		int sine1 = (Y - maniac.y) / ManiacDist(maniac);
+		int cosine1 = (X - maniac.x) / ManiacDist(maniac);
+		maniac.dx = dS * cosine1 / 5;
+		maniac.dy = 0;
+	}
+
+
+
+}
+void MoveManiac(Maniac& maniac)
 {
 	maniac.rha += k * pi / 60;
 	if (maniac.rha > pi / 4)
@@ -121,9 +236,15 @@ void MoveManiac(Maniac &maniac)
 
 		maniac.dx = 0;
 		maniac.dy = 0;
+		maniac.point_x = player_x;
+		maniac.point_y = player_y;
+		maniac.x += dx;
+		maniac.y += dy;
 	}
 	else {
 		double a = maniac.point_x - maniac.x;
+
+
 		double b = maniac.point_y - maniac.y;
 		if (maniac.dx && maniac.dy && !(a * a + b * b <= 0.01)) {
 			dx = maniac.dx;
@@ -143,31 +264,33 @@ void MoveManiac(Maniac &maniac)
 
 			dx = dS * cosine / 10;
 			dy = dS * sine / 10;
-
 			maniac.point_x = check_points[index][0];
 			maniac.point_y = check_points[index][1];
 			maniac.dx = dx;
 			maniac.dy = dy;
+			if (wall_collision(maniac.x + 2, maniac.y)) {
+				switch_way(maniac, maniac.x + 2, maniac.y);
+			}
+			else if (wall_collision(maniac.x, maniac.y + 2))
+				switch_way(maniac, maniac.x, maniac.y + 2);
+
+			maniac.x += maniac.dx;
+			maniac.y += maniac.dy;
 		}
+
 	}
 
-	maniac.x += dx;
-	maniac.y += dy;
+
 }
 
-double ManiacDist(Maniac maniac)
-{
-	double x = maniac.x - player_x;
-	double y = maniac.y - player_y;
-	return sqrt(x * x + y * y);
-}
+
 
 void DrawCuboid(double xr, double yr, double zr, double x0, double y0, double z0, double width_x, double width_y, double width_z, double *fillcolor, double *outcolor, bool legs_or_hands = false, bool forward = false)
 {
 	double x1 = x0-width_x / 2;
 	double y1 = y0-width_y / 2;
 	double z1 = z0-width_z / 2;
-	double x2 = x0+width_x / 2;
+	double x2 = x0 + width_x / 2;
 	double y2 = y0+width_y / 2;
 	double z2 = z0+width_z / 2;
 
@@ -237,6 +360,20 @@ void DrawCuboid(double xr, double yr, double zr, double x0, double y0, double z0
 	}
 
 	glEnd();
+	delete[] point1;
+	delete[] point2; 
+	delete[] point3,
+	delete[] point4;
+	delete[] point5; 
+	delete[] point6; 
+	delete[] point7; 
+	delete[] point8; 
+	for (int i = 0; i < 6; i++) {
+		delete[] trunk[i];
+	}
+	delete[] trunk;
+	delete[] fillcolor;
+	delete[] outcolor;
 }
 
 void DrawManiac(Maniac maniac)
@@ -263,27 +400,7 @@ void DrawManiac(Maniac maniac)
 	DrawCuboid(Sy * wallwidth - wallwidth / 4, wallheight / 12, Sx * wallwidth, -wallwidth / 8, -wallheight / 6, 0, wallwidth / 8, wallheight / 4, wallwidth / 8, new double[3]{ 0.9, 0.7, 0.7 }, new double[3]{ 1, 0.5, 0.5 }, true, true);
 }
 
-const char** field = new const char* [mapheight] {
-        "##########  ##########",
-        "#        #  #        #",
-        "#        ####        #",
-        "#               ######",
-        "#                    #",
-        "#                    #",
-        "######               #",
-        "#        ####        #",
-        "#        #  #        #",
-        "###    ###  ###    ###",
-		"#        #  #        #",
-		"#        ####        #",
-		"######               #",
-		"#                    #",
-		"#                    #",
-        "#               ######",
-		"#        ####        #",
-		"#        #  #        #",
-		"##########  ##########"
-};
+
 
 void DrawCube(int x, int y, bool roof, bool floor, double shade);
 
@@ -416,23 +533,24 @@ void update_cube(double x, double y, bool roof, bool floor)
 	if (roof) y2 = y1 + wallwidth;
 	else if (floor) y2 = -wallheight / 2;
 	double z2 = z1 + wallwidth;
+	double** points = new double*[9];
+	points[1] = new double[3]{ x1, y1, z1 };
+	points[2] = new double[3]{ x1, y2, z1 };
+	points[3] = new double[3]{ x2, y2, z1 };
+	points[4] = new double[3]{ x2, y1, z1 };
 
-	double* point1 = new double[3]{ x1, y1, z1 };
-	double* point2 = new double[3]{ x1, y2, z1 };
-	double* point3 = new double[3]{ x2, y2, z1 };
-	double* point4 = new double[3]{ x2, y1, z1 };
+	points[5] = new double[3]{ x1, y1, z2 };
+	points[6] = new double[3]{ x1, y2, z2 };
+	points[7] = new double[3]{ x2, y2, z2 };
+	points[8] = new double[3]{ x2, y1, z2 };
 
-	double* point5 = new double[3]{ x1, y1, z2 };
-	double* point6 = new double[3]{ x1, y2, z2 };
-	double* point7 = new double[3]{ x2, y2, z2 };
-	double* point8 = new double[3]{ x2, y1, z2 };
-
-	current_cube[0] = new double* [4]{ point1, point2, point3, point4 };
-	current_cube[1] = new double* [4]{ point5, point6, point7, point8 };
-	current_cube[2] = new double* [4]{ point6, point2, point3, point7 };
-	current_cube[3] = new double* [4]{ point5, point1, point4, point8 };
-	current_cube[4] = new double* [4]{ point6, point2, point1, point5 };
-	current_cube[5] = new double* [4]{ point7, point3, point4, point8 };
+	current_cube[0] = new double* [4]{ points[1], points[2], points[3], points[4] };
+	current_cube[1] = new double* [4]{ points[5], points[6], points[7], points[8] };
+	current_cube[2] = new double* [4]{ points[6], points[2], points[3], points[7] };
+	current_cube[3] = new double* [4]{ points[5], points[1], points[4], points[8] };
+	current_cube[4] = new double* [4]{ points[6], points[2], points[1], points[5] };
+	current_cube[5] = new double* [4]{ points[7], points[3], points[4], points[8] };
+	delete[] points;
 }
 
 void DrawCube(int x, int y, bool roof, bool floor, double shade)
@@ -473,8 +591,19 @@ void DrawCube(int x, int y, bool roof, bool floor, double shade)
 			glVertex3f(current_cube[i][j][0], current_cube[i][j][1], current_cube[i][j][2]);
 		}
 	}
-
+	
 	glEnd();
+
+	/*for (int i = 0; i < 6; i++) {
+		for (int j = 0; j < 4; j++) {
+			if (current_cube[i][j] != nullptr) {
+				delete[] current_cube[i][j];
+				current_cube[i][j] = nullptr;
+			}
+		}
+		delete[] current_cube[i];
+		current_cube[i] = nullptr;
+	}*/
 }
 
 double degrees_to_radians(double angle)
