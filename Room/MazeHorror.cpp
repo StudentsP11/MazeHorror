@@ -11,7 +11,8 @@
 #include <ctime>
 #include <iostream>
 #include <algorithm>
-//#pragma comment(lib, "irrKlang.lib")
+#pragma comment(lib, "irrKlang.lib")
+#include <vector>
 using namespace irrklang;
 #define rha right_hand_angle
 
@@ -204,12 +205,110 @@ void switch_way(Maniac& maniac, int X, int Y) {
 		maniac.dx = dS * cosine1 / 5;
 		maniac.dy = 0;
 	}
-
-
-
 }
+
+void check_checkpoints(Maniac& maniac) {
+	double sine, cosine, dx, dy;
+	int index = rand() % chckpntsnum;
+	double a = check_points[index][0] - maniac.x;
+	double b = check_points[index][1] - maniac.y;
+	double S = sqrt(a * a + b * b);
+	cosine = a / S;
+	sine = b / S;
+	double angle = asin(sine);
+	if (cosine > 0 && cos(angle) < 0 || cosine < 0 && cos(angle) > 0)
+		angle = pi - angle;
+	maniac.rot_angle = pi - angle;
+
+	dx = dS * cosine / 10;
+	dy = dS * sine / 10;
+	maniac.point_x = check_points[index][0];
+	maniac.point_y = check_points[index][1];
+	maniac.dx = dx;
+	maniac.dy = dy;
+}
+
+struct Point {
+	int x;
+	int y;
+};
+
+double dist(double pt_x, double pt_y, double X, double Y) {
+	double x = X - pt_x;
+	double y = Y - pt_y;
+	return sqrt(x * x + y * y);
+}
+//void check_cells(Maniac& maniac) {
+//	int x = ceil(maniac.x);
+//	int y = ceil(maniac.y);
+//	Point central_cell = { x, y };
+//	int standing[3][3];
+//	if (maniac.y < 1) {
+//		for (int i = 0; i < 3; i++) {
+//			standing[0][i] = -1;
+//		}
+//	}
+//	if (maniac.y > mapheight - 1) {
+//		for (int i = 0; i < 3; i++) {
+//			standing[2][i] = -1;
+//		}
+//	}
+//	if (maniac.x < 1) {
+//		for (int i = 0; i < 3; i++) {
+//			standing[i][0] = -1;
+//		}
+//	}
+//	if (maniac.x > mapwidth - 1) {
+//		for (int i = 0; i < 3; i++) {
+//			standing[i][2] = -1;
+//		}
+//	}
+//	//sqrt(x * x + y * y);
+//	int minDist = sqrt(mapwidth * mapwidth + mapheight * mapheight);
+//	int min_x = mapheight, min_y = mapwidth;
+//	for (int i = int(maniac.y) < 1 ? 0 : maniac.y - 1; i < int(maniac.y) + 2; i++) {
+//		for (int j = int(maniac.x) < 1 ? 0 : maniac.x - 1; j < int(maniac.x) + 2; j++) {
+//			if (field[i][j] != '#' and standing[i - int(maniac.y) + 1][j - int(maniac.x) + 1] != -1) {
+//				standing[i - int(maniac.y) + 1][j - int(maniac.x) + 1] = dist(maniac.point_x, maniac.point_y, j, i);
+//				if (minDist > standing[i - y + 1][j - x + 1]) {
+//					minDist = standing[i - y + 1][j - x + 1];
+//					min_x = j;
+//					min_y = i;
+//				}
+//			}
+//		}
+//	}
+//	double sine = (double(min_y) - maniac.y) / dist(maniac.x, maniac.y, min_x, min_y);
+//	double cosine = (double(min_x) - maniac.x) / dist(maniac.x, maniac.y, min_x, min_y);
+//	maniac.dx = dS * cosine / 5;
+//	maniac.dy = dS * sine / 5;
+//}
+
+
+void maniac_Move(Maniac &maniac) {
+	maniac.x += maniac.dx;
+	maniac.y += maniac.dy;
+	
+}
+
+void stuck_in_the_wall(Maniac& maniac) {
+	Point maniac_coordinates = { maniac.x, maniac.y };
+	if (field[maniac_coordinates.y][maniac_coordinates.x] == '#') {
+		for (int i = int(maniac.y) < 1 ? 0 : maniac.y - 1; i < int(maniac.y) + 2; i++) {
+			for (int j = int(maniac.x) < 1 ? 0 : maniac.x - 1; j < int(maniac.x) + 2; j++) {
+				if (field[i][j] == ' ') {
+					maniac.x = j;
+					maniac.y = i;
+				}
+			}
+		}
+	}
+}
+
+
 void MoveManiac(Maniac& maniac)
 {
+
 	maniac.rha += k * pi / 60;
 	if (maniac.rha > pi / 4)
 	{
@@ -221,66 +320,31 @@ void MoveManiac(Maniac& maniac)
 		maniac.right_hand_angle = -pi / 4;
 		k = 1;
 	}
-
 	double sine, cosine, dx, dy;
+	sine = (player_y - maniac.y) / ManiacDist(maniac);
+	cosine = (player_x - maniac.x) / ManiacDist(maniac);
+	double angle = asin(sine);
+	if (cosine > 0 && cos(angle) < 0 || cosine < 0 && cos(angle) > 0)
+		angle = pi - angle;
+	maniac.rot_angle = pi - angle;
+
+
 	if (sees(maniac)) {
-		sine = (player_y - maniac.y) / ManiacDist(maniac);
-		cosine = (player_x - maniac.x) / ManiacDist(maniac);
-		double angle = asin(sine);
-		if (cosine > 0 && cos(angle) < 0 || cosine < 0 && cos(angle) > 0)
-			angle = pi - angle;
-		maniac.rot_angle = pi - angle;
-
-		dx = dS * cosine / 5;
-		dy = dS * sine / 5;
-
-		maniac.dx = 0;
-		maniac.dy = 0;
 		maniac.point_x = player_x;
 		maniac.point_y = player_y;
-		maniac.x += dx;
-		maniac.y += dy;
+
 	}
 	else {
-		double a = maniac.point_x - maniac.x;
-
-
-		double b = maniac.point_y - maniac.y;
-		if (maniac.dx && maniac.dy && !(a * a + b * b <= 0.01)) {
-			dx = maniac.dx;
-			dy = maniac.dy;
-		}
-		else {
-			int index = rand() % chckpntsnum;
-			double a = check_points[index][0] - maniac.x;
-			double b = check_points[index][1] - maniac.y;
-			double S = sqrt(a * a + b * b);
-			cosine = a / S;
-			sine = b / S;
-			double angle = asin(sine);
-			if (cosine > 0 && cos(angle) < 0 || cosine < 0 && cos(angle) > 0)
-				angle = pi - angle;
-			maniac.rot_angle = pi - angle;
-
-			dx = dS * cosine / 10;
-			dy = dS * sine / 10;
-			maniac.point_x = check_points[index][0];
-			maniac.point_y = check_points[index][1];
-			maniac.dx = dx;
-			maniac.dy = dy;
-			if (wall_collision(maniac.x + 2, maniac.y)) {
-				switch_way(maniac, maniac.x + 2, maniac.y);
-			}
-			else if (wall_collision(maniac.x, maniac.y + 2))
-				switch_way(maniac, maniac.x, maniac.y + 2);
-
-			maniac.x += maniac.dx;
-			maniac.y += maniac.dy;
-		}
-
+		int index = rand() % chckpntsnum;
+		maniac.point_x = check_points[index][0];
+		maniac.point_y = check_points[index][1];
 	}
-
-
+	
+	int x = maniac.x - maniac.point_x;
+	int y = maniac.y - maniac.point_y;
+	if(sqrt(x*x + y*y) <= 0.01)
+		check_cells(maniac);
+	maniac_Move(maniac);
 }
 
 
