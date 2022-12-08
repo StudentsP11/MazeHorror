@@ -81,19 +81,7 @@ double** RotatePolygon(double** polygon, double verts_amount, double angle, bool
 	return new_polygon;
 }
 
-double* is_wall_on_way(Maniac maniac)
-{
-	double y = maniac.point_y - maniac.y;
-	double x = maniac.point_x - maniac.x;
-	double tg = y / x;
-	for (double X = std::min(maniac.x, player_x); X < std::max(maniac.x, player_x); X += 0.5)
-	{
-		double Y = maniac.y + tg * (X - std::min(maniac.x, player_x));
-		if (wall_collision(X, Y))
-			return new double[2] {X, Y};
-	}
-	return 0;
-}
+
 
 bool sees(Maniac maniac)
 {
