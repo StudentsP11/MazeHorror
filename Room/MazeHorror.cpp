@@ -1,17 +1,18 @@
-﻿// Room.cpp : Этот файл содержит функцию "main". Здесь начинается и заканчивается выполнение программы.
-//
-
-#define GLEW_STATIC
-#include <GL/glew.h>
-#include <GL/GL.h>
-#include <GL/GLU.h>
-#include <GL/GLUT.h>
-#include <irrKlang.h>
-#include <cmath>
+﻿#include <cmath>
 #include <ctime>
 #include <iostream>
 #include <algorithm>
+
+#include <GL/glew.h>
+
+#include <GL/gl.h>
+#include <GL/glu.h>
+#include <GL/GLUT.h>
+#include <SDL2/sdl.h>
+#include <irrKlang.h>
+
 //#pragma comment(lib, "irrKlang.lib")
+
 using namespace irrklang;
 #define rha right_hand_angle
 
@@ -414,11 +415,11 @@ void reshape(int w, int h)
 	glMatrixMode(GL_MODELVIEW);
 }
 
-void timer(int)
-{
-	glutPostRedisplay();
-	glutTimerFunc(1000 / 60, timer, 0);
-}
+//void timer(int)
+//{
+//	glutPostRedisplay();
+//	glutTimerFunc(1000 / 60, timer, 0);
+//}
 
 void init()
 {
@@ -427,62 +428,8 @@ void init()
 	glEnable(GL_NORMALIZE);
 }
 
-void display()
-{
-	if (!died)
-	{
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glClearDepth(0);
-		glDepthFunc(GL_GREATER);
-		glLoadIdentity();
-
-		glRotatef(rotation_angle, 0, 1, 0);
-
-		DrawManiac(maniac);
-		double S = ManiacDist(maniac);
-		double volume = 1 / (1 + S);
-		sound->setVolume(volume);
-		sound->setIsPaused(false);
-		MoveManiac(maniac);
-
-		for (int x = 0; x < mapwidth; x++)
-		{
-			for (int y = 0; y < mapheight; y++)
-			{
-				char cell = field[y][x];
-				double shade;
-				double a = x - player_x;
-				double b = y - player_y;
-				double a2 = x - maniac.x;
-				double b2 = y - maniac.y;
-				if (cell == '#')
-				{
-					double S = sqrt(a * a + b * b);
-					double S2 = sqrt(a2 * a2 + b2 * b2);
-					shade = d0 / (d0 + S) + d0 / (d0 + S2);
-					DrawCube(x, y, false, false, shade);
-				}
-				double c = wallheight / 2;
-				double S = sqrt(a * a + b * b + c * c);
-				double S2 = sqrt(a2 * a2 + b2 * b2 + c * c);
-				shade = d0 / (d0 + S) + d0 / (d0 + S2);
-				DrawCube(x, y, true, false, shade);
-				DrawCube(x, y, false, true, shade);
-			}
-		}
-		if (ManiacDist(maniac) <= 1) {
-			died = true;
-			sound->stop();
-			sound = engine->play2D("Sounds/benzopila.wav", true, true, false, ESM_AUTO_DETECT, true);
-			sound->setVolume(1);
-			sound->setIsPaused(false);
-			sound2 = engine->play2D("Sounds/krik.mp3", true, true, false, ESM_AUTO_DETECT, true);
-			sound2->setVolume(1);
-			sound2->setIsPaused(false);
-		}
-	}
-
-	else if (count == 120)
+void OnDied() {
+	if (count == 120)
 	{
 		sound->stop();
 		sound2->stop();
@@ -490,34 +437,90 @@ void display()
 		glClearDepth(0);
 		glDepthFunc(GL_GREATER);
 		glLoadIdentity();
+		return;
 	}
+	count++;
 
-	else
+	glClearDepth(0);
+	glDepthFunc(GL_GREATER);
+	glLoadIdentity();
+
+	glBegin(GL_QUADS);
+	glColor3f(1, 0, 0);
+
+	for (int i = 0; i < 200; i++)
 	{
-		count++;
+		double x = (rand() % 1000) / 2000.0 - 0.25;
+		double y = (rand() % 1000) / 2000.0 - 0.25;
 
-		glClearDepth(0);
-		glDepthFunc(GL_GREATER);
-		glLoadIdentity();
-
-		glBegin(GL_QUADS);
-		glColor3f(1, 0, 0);
-
-		for (int i = 0; i < 200; i++)
-		{
-			double x = (rand() % 1000) / 2000.0 - 0.25;
-			double y = (rand() % 1000) / 2000.0 - 0.25;
-
-			glVertex3f(x, y, -0.1);
-			glVertex3f(x + 0.002, y, -0.1);
-			glVertex3f(x + 0.002, y + 0.002, -0.1);
-			glVertex3f(x, y + 0.002, -0.1);
-		}
-
-		glEnd();
+		glVertex3f(x, y, -0.1);
+		glVertex3f(x + 0.002, y, -0.1);
+		glVertex3f(x + 0.002, y + 0.002, -0.1);
+		glVertex3f(x, y + 0.002, -0.1);
 	}
 
-	glutSwapBuffers();
+	glEnd();
+}
+
+void render()
+{
+	if (died)
+	{
+		OnDied();
+		return;
+	}
+
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glClearDepth(0);
+	glDepthFunc(GL_GREATER);
+	glLoadIdentity();
+
+	glRotatef(rotation_angle, 0, 1, 0);
+
+	DrawManiac(maniac);
+	double S = ManiacDist(maniac);
+	double volume = 1 / (1 + S);
+	sound->setVolume(volume);
+	sound->setIsPaused(false);
+	MoveManiac(maniac);
+
+	for (int x = 0; x < mapwidth; x++)
+	{
+		for (int y = 0; y < mapheight; y++)
+		{
+			char cell = field[y][x];
+			double shade;
+			double a = x - player_x;
+			double b = y - player_y;
+			double a2 = x - maniac.x;
+			double b2 = y - maniac.y;
+			if (cell == '#')
+			{
+				double S = sqrt(a * a + b * b);
+				double S2 = sqrt(a2 * a2 + b2 * b2);
+				shade = d0 / (d0 + S) + d0 / (d0 + S2);
+				DrawCube(x, y, false, false, shade);
+			}
+			double c = wallheight / 2;
+			double S = sqrt(a * a + b * b + c * c);
+			double S2 = sqrt(a2 * a2 + b2 * b2 + c * c);
+			shade = d0 / (d0 + S) + d0 / (d0 + S2);
+			DrawCube(x, y, true, false, shade);
+			DrawCube(x, y, false, true, shade);
+		}
+	}
+	if (ManiacDist(maniac) <= 1) {
+		died = true;
+		sound->stop();
+		sound = engine->play2D("Sounds/benzopila.wav", true, true, false, ESM_AUTO_DETECT, true);
+		sound->setVolume(1);
+		sound->setIsPaused(false);
+		sound2 = engine->play2D("Sounds/krik.mp3", true, true, false, ESM_AUTO_DETECT, true);
+		sound2->setVolume(1);
+		sound2->setIsPaused(false);
+	}
+
+	//glutSwapBuffers();
 }
 
 void update_cube(double x, double y, bool roof, bool floor)
@@ -568,7 +571,6 @@ void DrawCube(int x, int y, bool roof, bool floor, double shade)
 	glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
 	glEnable(GL_BLEND);
 	glEnable(GL_LINE_SMOOTH);
-
 	glColor3f(shade + 0.1, shade + 0.1, shade + 0.1);
 	for (int i = 0; i < 6; i++)
 	{
@@ -663,28 +665,58 @@ void motion(unsigned char key, int x, int y)
 	}
 }
 
-int main(int argc, char** argv) {
+const int SCREEN_WIDTH = 640;
+const int SCREEN_HEIGHT = 480;
+
+int SDL_main(int argc, char ** argv) {
 	srand(time(NULL));
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
 
-	//GLUT stuff
-	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
+	if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
+	{
+		return 1;
+	}
 
-	glutInitWindowPosition(200, 100);
-	glutInitWindowSize(Cw, Ch);
+	SDL_Surface* screen_surface = NULL;
 
-	glutCreateWindow("Window 1");
+	SDL_Window* window = NULL;
 
-	glutDisplayFunc(display);
-	glutReshapeFunc(reshape);
-	glutTimerFunc(0, timer, 0);
-	init();
+	auto gl_context = SDL_GL_CreateContext(window);
 
-	glutPostRedisplay();
-	// TODO: Handle all presed keys
-	glutKeyboardFunc(motion);
+	window = SDL_CreateWindow("Hello, SDL 2!", SDL_WINDOWPOS_UNDEFINED,
+		SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT,
+		SDL_WINDOW_SHOWN);
 
-	glutMainLoop();
+	if (window == NULL) {
+		return 1;
+	}
+
+	screen_surface = SDL_GetWindowSurface(window);
+
+	SDL_Event event;
+
+	for (;;) {
+		SDL_PollEvent(&event);
+		if (event.type == SDL_QUIT)
+			break;
+
+		render();
+
+		SDL_GL_SwapWindow(window);
+	}
+	SDL_DestroyWindow(window);
+
+	SDL_Quit();
+	//glutDisplayFunc(render);
+	//glutReshapeFunc(reshape);
+	//glutTimerFunc(0, timer, 0);
+	//init();
+	
+	//glutPostRedisplay();
+	//// TODO: Handle all presed keys
+	//glutKeyboardFunc(motion);
+
+	//glutMainLoop();
 
 	return 0;
 }
