@@ -7,7 +7,6 @@
 #include <GL/glew.h>
 #include <GL/gl.h>
 #include <GL/glu.h>
-#include <GL/GLUT.h>
 #include <SDL2/sdl.h>
 #include <irrKlang.h>
 
