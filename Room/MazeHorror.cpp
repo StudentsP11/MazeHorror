@@ -5,10 +5,13 @@
 #include <map>
 #include <vector>
 
+// GRAPHICS (DO NOT TOUCH)
 #include <GL/glew.h>
 #include <GL/gl.h>
 #include <GL/glu.h>
+#include <GL/freeglut.h>
 #include <SDL2/sdl.h>
+// END GRAPHICS
 #include <irrKlang.h>
 
 #include "Direction.h"
