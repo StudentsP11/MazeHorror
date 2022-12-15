@@ -1,18 +1,20 @@
-﻿// Room.cpp : Этот файл содержит функцию "main". Здесь начинается и заканчивается выполнение программы.
-//
-
-#define GLEW_STATIC
-#include <GL/glew.h>
-#include <GL/GL.h>
-#include <GL/GLU.h>
-#include <GL/GLUT.h>
-#include <irrKlang.h>
-#include <cmath>
+﻿#include <cmath>
 #include <ctime>
 #include <iostream>
 #include <algorithm>
-#pragma comment(lib, "irrKlang.lib")
+#include <map>
 #include <vector>
+
+#include <GL/glew.h>
+#include <GL/gl.h>
+#include <GL/glu.h>
+#include <SDL2/sdl.h>
+#include <irrKlang.h>
+
+#include "Direction.h"
+
+#pragma comment(lib, "irrKlang.lib")
+
 using namespace irrklang;
 #define rha right_hand_angle
 
@@ -34,7 +36,7 @@ double player_x = 5;
 double player_y = 5;
 double pi = acos(0) * 2;
 double dA = 5;
-double dS = 0.2;
+double dS = 0.05;
 int Cw = 1000;
 int Ch = 1000;
 double rotation_angle = 0;
@@ -51,6 +53,8 @@ Maniac maniac = { 1, 4, 0, 0, 0, 0, 0, 0 };
 ISoundEngine* engine = createIrrKlangDevice();
 ISound* sound = engine->play2D("Sounds/scary_sound.mp3", true, true, false, ESM_AUTO_DETECT, true);
 ISound* sound2;
+
+void move(const Direction direction);
 
 double** RotatePolygon(double** polygon, double verts_amount, double angle, bool axis_y = true)
 {
@@ -77,7 +81,7 @@ double** RotatePolygon(double** polygon, double verts_amount, double angle, bool
 			new_polygon[i][2] = new_z;
 		}
 	}
-	delete[] polygon;
+	/*delete[] polygon;*/
 	return new_polygon;
 }
 
@@ -440,20 +444,20 @@ void DrawCuboid(double xr, double yr, double zr, double x0, double y0, double z0
 	}
 
 	glEnd();
-	delete[] point1;
-	delete[] point2; 
-	delete[] point3,
-	delete[] point4;
-	delete[] point5; 
-	delete[] point6; 
-	delete[] point7; 
-	delete[] point8; 
-	for (int i = 0; i < 6; i++) {
-		delete[] trunk[i];
-	}
-	delete[] trunk;
-	delete[] fillcolor;
-	delete[] outcolor;
+	//delete[] point1;
+	//delete[] point2; 
+	//delete[] point3,
+	//delete[] point4;
+	//delete[] point5; 
+	//delete[] point6; 
+	//delete[] point7; 
+	//delete[] point8; 
+	//for (int i = 0; i < 6; i++) {
+	//	delete[] trunk[i];
+	//}
+	//delete[] trunk;
+	//delete[] fillcolor;
+	//delete[] outcolor;
 }
 
 void DrawManiac(Maniac maniac)
@@ -492,77 +496,18 @@ void reshape(int w, int h)
 	gluOrtho2D(-1, 1, -1, 1);
 	gluPerspective(120, 1, 0.1, 100);
 	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
 }
 
-void timer(int)
-{
-	glutPostRedisplay();
-	glutTimerFunc(1000 / 60, timer, 0);
-}
-
-void init()
+void InitGraphics()
 {
 	glClearColor(0, 0, 0, 1);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_NORMALIZE);
 }
 
-void display()
-{
-	if (!died)
-	{
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glClearDepth(0);
-		glDepthFunc(GL_GREATER);
-		glLoadIdentity();
-
-		glRotatef(rotation_angle, 0, 1, 0);
-
-		DrawManiac(maniac);
-		double S = ManiacDist(maniac);
-		double volume = 1 / (1 + S);
-		sound->setVolume(volume);
-		sound->setIsPaused(false);
-		MoveManiac(maniac);
-
-		for (int x = 0; x < mapwidth; x++)
-		{
-			for (int y = 0; y < mapheight; y++)
-			{
-				char cell = field[y][x];
-				double shade;
-				double a = x - player_x;
-				double b = y - player_y;
-				double a2 = x - maniac.x;
-				double b2 = y - maniac.y;
-				if (cell == '#')
-				{
-					double S = sqrt(a * a + b * b);
-					double S2 = sqrt(a2 * a2 + b2 * b2);
-					shade = d0 / (d0 + S) + d0 / (d0 + S2);
-					DrawCube(x, y, false, false, shade);
-				}
-				double c = wallheight / 2;
-				double S = sqrt(a * a + b * b + c * c);
-				double S2 = sqrt(a2 * a2 + b2 * b2 + c * c);
-				shade = d0 / (d0 + S) + d0 / (d0 + S2);
-				DrawCube(x, y, true, false, shade);
-				DrawCube(x, y, false, true, shade);
-			}
-		}
-		if (ManiacDist(maniac) <= 1) {
-			died = true;
-			sound->stop();
-			sound = engine->play2D("Sounds/benzopila.wav", true, true, false, ESM_AUTO_DETECT, true);
-			sound->setVolume(1);
-			sound->setIsPaused(false);
-			sound2 = engine->play2D("Sounds/krik.mp3", true, true, false, ESM_AUTO_DETECT, true);
-			sound2->setVolume(1);
-			sound2->setIsPaused(false);
-		}
-	}
-
-	else if (count == 120)
+void OnDied() {
+	if (count == 220)
 	{
 		sound->stop();
 		sound2->stop();
@@ -570,34 +515,89 @@ void display()
 		glClearDepth(0);
 		glDepthFunc(GL_GREATER);
 		glLoadIdentity();
+		return;
 	}
 
-	else
+	count++;
+
+	glClearDepth(0);
+	glDepthFunc(GL_GREATER);
+	glLoadIdentity();
+
+	glBegin(GL_QUADS);
+	glColor3f(1, 0, 0);
+
+	for (int i = 0; i < 200; i++)
 	{
-		count++;
+		double x = (rand() % 1000) / 2000.0 - 0.25;
+		double y = (rand() % 1000) / 2000.0 - 0.25;
 
-		glClearDepth(0);
-		glDepthFunc(GL_GREATER);
-		glLoadIdentity();
-
-		glBegin(GL_QUADS);
-		glColor3f(1, 0, 0);
-
-		for (int i = 0; i < 200; i++)
-		{
-			double x = (rand() % 1000) / 2000.0 - 0.25;
-			double y = (rand() % 1000) / 2000.0 - 0.25;
-
-			glVertex3f(x, y, -0.1);
-			glVertex3f(x + 0.002, y, -0.1);
-			glVertex3f(x + 0.002, y + 0.002, -0.1);
-			glVertex3f(x, y + 0.002, -0.1);
-		}
-
-		glEnd();
+		glVertex3f(x, y, -0.1);
+		glVertex3f(x + 0.002, y, -0.1);
+		glVertex3f(x + 0.002, y + 0.002, -0.1);
+		glVertex3f(x, y + 0.002, -0.1);
 	}
 
-	glutSwapBuffers();
+	glEnd();
+}
+
+void render()
+{
+	if (died)
+	{
+		OnDied();
+		return;
+	}
+
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glClearDepth(0);
+	glDepthFunc(GL_GREATER);
+	glLoadIdentity();
+
+	glRotatef(rotation_angle, 0, 1, 0);
+
+	DrawManiac(maniac);
+	double S = ManiacDist(maniac);
+	double volume = 1 / (1 + S);
+	sound->setVolume(volume);
+	sound->setIsPaused(false);
+	MoveManiac(maniac);
+
+	for (int x = 0; x < mapwidth; x++)
+	{
+		for (int y = 0; y < mapheight; y++)
+		{
+			char cell = field[y][x];
+			double shade;
+			double a = x - player_x;
+			double b = y - player_y;
+			double a2 = x - maniac.x;
+			double b2 = y - maniac.y;
+			if (cell == '#')
+			{
+				double S = sqrt(a * a + b * b);
+				double S2 = sqrt(a2 * a2 + b2 * b2);
+				shade = d0 / (d0 + S) + d0 / (d0 + S2);
+				DrawCube(x, y, false, false, shade);
+			}
+			double c = wallheight / 2;
+			double S = sqrt(a * a + b * b + c * c);
+			double S2 = sqrt(a2 * a2 + b2 * b2 + c * c);
+			shade = d0 / (d0 + S) + d0 / (d0 + S2);
+			DrawCube(x, y, true, false, shade);
+			DrawCube(x, y, false, true, shade);
+		}
+	}
+	if (ManiacDist(maniac) <= 1) {
+		died = true;
+		sound->stop();
+		sound = engine->play2D("Sounds/benzopila.wav", true, true, false, ESM_AUTO_DETECT, true);
+		sound->setVolume(1);
+		sound->setIsPaused(false);
+		sound2 = engine->play2D("Sounds/krik.mp3", true, true, false, ESM_AUTO_DETECT, true);
+		sound2->setVolume(0.5);
+		sound2->setIsPaused(false);
+	}
 }
 
 void update_cube(double x, double y, bool roof, bool floor)
@@ -630,7 +630,7 @@ void update_cube(double x, double y, bool roof, bool floor)
 	current_cube[3] = new double* [4]{ points[5], points[1], points[4], points[8] };
 	current_cube[4] = new double* [4]{ points[6], points[2], points[1], points[5] };
 	current_cube[5] = new double* [4]{ points[7], points[3], points[4], points[8] };
-	delete[] points;
+	// delete[] points;
 }
 
 void DrawCube(int x, int y, bool roof, bool floor, double shade)
@@ -648,7 +648,6 @@ void DrawCube(int x, int y, bool roof, bool floor, double shade)
 	glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
 	glEnable(GL_BLEND);
 	glEnable(GL_LINE_SMOOTH);
-
 	glColor3f(shade + 0.1, shade + 0.1, shade + 0.1);
 	for (int i = 0; i < 6; i++)
 	{
@@ -674,16 +673,10 @@ void DrawCube(int x, int y, bool roof, bool floor, double shade)
 	
 	glEnd();
 
-	/*for (int i = 0; i < 6; i++) {
-		for (int j = 0; j < 4; j++) {
-			if (current_cube[i][j] != nullptr) {
-				delete[] current_cube[i][j];
-				current_cube[i][j] = nullptr;
-			}
-		}
-		delete[] current_cube[i];
-		current_cube[i] = nullptr;
-	}*/
+	//for (int i = 0; i < 6; i++) {
+	//	delete[] current_cube[i];
+	//	current_cube[i] = nullptr;
+	//}
 }
 
 double degrees_to_radians(double angle)
@@ -713,58 +706,121 @@ bool wall_collision(double player_x, double player_y)
 	return false;
 }
 
-void motion(unsigned char key, int x, int y)
-{
-	double alpha = degrees_to_radians(rotation_angle);
-	double dx = sin(alpha) * dS;
-	double dy = cos(alpha) * dS;
-	if (key == 'a') rotation_angle -= dA;
-	else if (key == 'd') rotation_angle += dA;
-	if (key == 'w') {
-		player_y -= dx;
-		player_x -= dy;
-	}
-	else if (key == 's') {
-		player_y += dx;
-		player_x += dy;
-	}
+void HandlePlayerControl(SDL_Event event) {
+	const auto is_keys_down = SDL_GetKeyboardState(nullptr);
 
-	if (wall_collision(player_x, player_y))
-	{
-		if (key == 'w')
-		{
-			player_y += dx;
-			player_x += dy;
-		}
-		else if (key == 's') {
-			player_y -= dx;
-			player_x -= dy;
+	std::vector<SDL_Scancode> check_keys;
+
+	for (const auto& direction : DIRECTIONS) {
+		auto check_keys = AllKeysFor(direction);
+		if (std::any_of(
+			check_keys.begin(),
+			check_keys.end(), 
+			[is_keys_down](SDL_Scancode key) { return is_keys_down[key]; })) {
+			move(direction);
 		}
 	}
 }
 
-int main(int argc, char** argv) {
+void move(const Direction direction)
+{
+	double alpha = degrees_to_radians(rotation_angle);
+	double dx = cos(alpha) * dS;
+	double dy = sin(alpha) * dS;
+
+	if (direction == Direction::LEFT) rotation_angle -= dA;
+	else if (direction == Direction::RIGHT) rotation_angle += dA;
+	if (direction == Direction::UP) {
+		player_y -= dy;
+		player_x -= dx;
+	}
+	else if (direction == Direction::DOWN) {
+		player_y += dy;
+		player_x += dx;
+	}
+
+	if (wall_collision(player_x, player_y))
+	{
+		if (direction == Direction::UP)
+		{
+			player_y += dy;
+			player_x += dx;
+		}
+		else if (direction == Direction::UP) {
+			player_y -= dy;
+			player_x -= dx;
+		}
+	}
+}
+
+void InitSDLAttributes() {
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 32);
+}
+
+SDL_Window* InitWindow(const int screen_width, const int screen_height) {
+	InitSDLAttributes();
+
+	if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
+	{
+		std::cout << "SDL_Init Error: " << SDL_GetError() << std::endl;
+		return nullptr;
+	}
+
+	SDL_Window* window = SDL_CreateWindow("Maze Horror", SDL_WINDOWPOS_UNDEFINED,
+		SDL_WINDOWPOS_UNDEFINED, screen_width, screen_height,
+		SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+
+	SDL_GLContext gl_context = SDL_GL_CreateContext(window);
+
+	SDL_GL_SetSwapInterval(-1);
+
+	if (window == NULL) {
+		std::cout << "SDL_Init Error: " << SDL_GetError() << std::endl;
+		return nullptr;
+	}
+
+	SDL_Surface* screen_surface = SDL_GetWindowSurface(window);
+
+	InitGraphics();
+
+	return window;
+}
+
+int SDL_main(int argc, char ** argv) {
 	srand(time(NULL));
 
-	//GLUT stuff
-	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
+	int screen_width = 1280;
+	int screen_height = 960;
 
-	glutInitWindowPosition(200, 100);
-	glutInitWindowSize(Cw, Ch);
+	SDL_Window* window = InitWindow(screen_width, screen_height);
 
-	glutCreateWindow("Window 1");
+	SDL_Event event;
 
-	glutDisplayFunc(display);
-	glutReshapeFunc(reshape);
-	glutTimerFunc(0, timer, 0);
-	init();
+	for (;;) {
+		SDL_PollEvent(&event);
+		
+		if (event.type == SDL_QUIT)
+			break;
 
-	glutPostRedisplay();
-	// TODO: Handle all presed keys
-	glutKeyboardFunc(motion);
+		HandlePlayerControl(event);
 
-	glutMainLoop();
+		SDL_GetWindowSize(window, &screen_width, &screen_height);
+		reshape(screen_width, screen_height);
+
+		render();
+
+		SDL_GL_SwapWindow(window);
+	}
+
+	SDL_DestroyWindow(window);
+
+	SDL_Quit();
 
 	return 0;
 }

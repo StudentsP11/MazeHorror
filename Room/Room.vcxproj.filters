@@ -16,29 +16,23 @@
     <Filter Include="Файлы ресурсов\Sounds">
       <UniqueIdentifier>{ce3244d3-fbbb-410f-9688-011e68bf3fba}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Файлы ресурсов\Libs">
-      <UniqueIdentifier>{abaa3220-b031-439e-b130-75904aae4a14}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="MazeHorror.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
+    <ClCompile Include="Direction.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
-    <None Include="ikpFlac.dll">
-      <Filter>Файлы ресурсов\Libs</Filter>
-    </None>
-    <None Include="ikpMP3.dll">
-      <Filter>Файлы ресурсов\Libs</Filter>
-    </None>
-    <None Include="irrKlang.dll">
-      <Filter>Файлы ресурсов\Libs</Filter>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="Direction.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
