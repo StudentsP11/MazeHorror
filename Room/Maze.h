@@ -23,23 +23,23 @@ public:
     char* operator[](size_t height_index) {
         if (height_index < 0 || height_index > height_ - 1)
             throw std::out_of_range("Index is out of boundaries");
-        return arr_[height_index];
+        return array_[height_index];
     }
 
-    char**& get_maze_array_unsafe__() {
-        return arr_;
-    }
+    const char const* const* array() const {
+        return array_;
+    };
 
-    const size_t& height() {
+    const size_t& height() const {
         return height_;
     }
 
-    const size_t& width() {
+    const size_t& width() const {
         return width_;
     }
 private:
     size_t height_, width_;
-    char** arr_;
+    char** array_;
 
     void Generate(); //Создание лабиринта
     void RemoveDeadend(int x, int y);

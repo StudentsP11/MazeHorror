@@ -7,29 +7,29 @@
 #include <array>
 
 enum class Direction {
-	DOWN,
-	UP,
+	BACKWARD,
+	FORWARD,
 	LEFT,
 	RIGHT
 };
 
 const std::array<Direction, 4> DIRECTIONS{
-	Direction::DOWN,
-	Direction::UP,
+	Direction::BACKWARD,
+	Direction::FORWARD,
 	Direction::LEFT,
 	Direction::RIGHT
 };
 
 const std::map<SDL_Scancode, Direction> keysAsDirections{
-		{SDL_SCANCODE_S, Direction::DOWN}, {SDL_SCANCODE_DOWN, Direction::DOWN},
-		{SDL_SCANCODE_W, Direction::UP}, {SDL_SCANCODE_UP, Direction::UP},
+		{SDL_SCANCODE_S, Direction::BACKWARD}, {SDL_SCANCODE_DOWN, Direction::BACKWARD},
+		{SDL_SCANCODE_W, Direction::FORWARD}, {SDL_SCANCODE_UP, Direction::FORWARD},
 		{SDL_SCANCODE_A, Direction::LEFT}, {SDL_SCANCODE_LEFT, Direction::LEFT},
 		{SDL_SCANCODE_D, Direction::RIGHT}, {SDL_SCANCODE_RIGHT, Direction::RIGHT}
 };
 
 const std::map<Direction, std::tuple<int, int>> directionsAsVectors{
-	{Direction::DOWN, {0, 1} },
-	{Direction::UP, {0, -1} },
+	{Direction::BACKWARD, {0, 1} },
+	{Direction::FORWARD, {0, -1} },
 	{Direction::LEFT, {-1, 0} },
 	{Direction::RIGHT, {1, 0} }
 };
