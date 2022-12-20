@@ -36,7 +36,7 @@ double*** current_cube = new double** [6];
 
 double mapwidth = 31;
 double mapheight = 31;
-double wallwidth = 1;
+double wallwidth = 0.5;
 double wallheight = 3;
 double player_x = 1;
 double player_y = 8;
@@ -60,7 +60,7 @@ ISoundEngine* engine = createIrrKlangDevice();
 ISound* sound = engine->play2D("Sounds/scary_sound.mp3", true, true, false, ESM_AUTO_DETECT, true);
 ISound* sound2;
 
-void move(const Direction direction);
+void Move(const Direction direction);
 
 double** RotatePolygon(double** polygon, double verts_amount, double angle, bool axis_y = true)
 {
@@ -128,14 +128,21 @@ double dist(double pt_x, double pt_y, double X, double Y) {
 }
 void check_cells(Maniac& maniac) {
 	Point current_position = {(maniac.x),(maniac.y) };
-	Point cell;
+	Point cell{ 0,0 };
 	double distance;
 	double dx, dy, cosine, sine;
 	double minDist = sqrt(mapheight*mapheight + mapwidth*mapwidth);
 	for (int i = 0; i < 3; i++) {
 		for (int j = 0; j < 3; j++) {
+			// TODO: Fix that behavior, wrong algoritm
+			
 			cell.y = current_position.y + i - 1;
 			cell.x = current_position.x + j - 1;
+			// Handler that doesnt accept error indexes
+			if (cell.y < 0 || cell.y >= mapheight
+				|| cell.x < 0 || cell.x >= mapwidth) {
+				continue;
+			}
 			if (field[cell.y][cell.x] == '#' or (i == 1 and j == 1)) {
 				continue;
 			}
@@ -148,6 +155,7 @@ void check_cells(Maniac& maniac) {
 				dy = dS * sine / 10;
 
 			}
+			
 		}
 	}
 	maniac.dx = dx;
@@ -672,9 +680,10 @@ double degrees_to_radians(double angle)
 	return angle / 180 * pi;
 }
 
+// TODO: Rework
 bool wall_collision(double player_x, double player_y)
 {
-	const double collision_border = 0.1;
+	const double collision_border = 0.5;
 	for (int x = 0; x < mapwidth; x++)
 	{
 		for (int y = 0; y < mapheight; y++)
@@ -706,13 +715,14 @@ void HandlePlayerControl(SDL_Event event) {
 		if (std::any_of(
 			check_keys.begin(),
 			check_keys.end(), 
-			[is_keys_down](SDL_Scancode key) { return is_keys_down[key]; })) {
-			move(direction);
+			[is_keys_down](SDL_Scancode key) { return is_keys_down[key]; })
+		) {
+			Move(direction);
 		}
 	}
 }
 
-void move(const Direction direction)
+void Move(const Direction direction)
 {
 	double alpha = degrees_to_radians(rotation_angle);
 	double dx = cos(alpha) * dS;
@@ -720,23 +730,24 @@ void move(const Direction direction)
 
 	if (direction == Direction::LEFT) rotation_angle -= dA;
 	else if (direction == Direction::RIGHT) rotation_angle += dA;
-	if (direction == Direction::UP) {
+	if (direction == Direction::FORWARD) {
 		player_y -= dy;
 		player_x -= dx;
 	}
-	else if (direction == Direction::DOWN) {
+	else if (direction == Direction::BACKWARD) {
 		player_y += dy;
 		player_x += dx;
 	}
 
-	if (wall_collision(player_x, player_y))
+	// TODO: Rework
+	if (false/*wall_collision(player_x, player_y)*/)
 	{
-		if (direction == Direction::UP)
+		if (direction == Direction::FORWARD)
 		{
 			player_y += dy;
 			player_x += dx;
 		}
-		else if (direction == Direction::UP) {
+		else if (direction == Direction::BACKWARD) {
 			player_y -= dy;
 			player_x -= dx;
 		}
@@ -790,7 +801,7 @@ std::pair<size_t, size_t> random_index_2d(size_t height, size_t width)
 	return { row_index, col_index };
 }
 
-std::pair<size_t, size_t> random_position(Maze maze) {
+std::pair<size_t, size_t> RandomPosition(const Maze& maze) {
 	auto position = random_index_2d(maze.height(), maze.width());
 	return { position.first % (maze.height() - 2) + 1,
 		position.first % (maze.height() - 2) + 1};
@@ -803,13 +814,19 @@ int SDL_main(int argc, char ** argv) {
 	srand(time(NULL));
 #endif
 	Maze maze(31, 31);
-
-	field = maze.get_maze_array_unsafe__();
+	
+	field = new char*[maze.height()];
+	for (size_t i = 0; i < maze.height(); i++) {
+		field[i] = new char[maze.width()];
+		for (size_t j = 0; j < maze.width(); j++) {
+			field[i][j] = maze.array()[i][j];
+		}
+	}
 
 	std::pair<size_t, size_t> player_position;
 
 	do {
-		player_position = random_position(maze);
+		player_position = RandomPosition(maze);
 	} while (field[player_position.first][player_position.second] == Maze::WALL);
 
 	maze.Print();
@@ -845,6 +862,10 @@ int SDL_main(int argc, char ** argv) {
 	SDL_DestroyWindow(window);
 
 	SDL_Quit();
+
+	for (size_t i = 0; i < maze.height(); i++)
+		delete[] field[i];
+	delete[] field;
 
 	return 0;
 }

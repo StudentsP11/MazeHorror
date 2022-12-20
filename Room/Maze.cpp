@@ -7,9 +7,9 @@ Maze::Maze(size_t width, size_t height) {
     width_ = width;
     height_ = height;
 
-    arr_ = new char* [height];
+    array_ = new char* [height];
     for (size_t i = 0; i < height; i++) {
-        arr_[i] = new char[width] {0};
+        array_[i] = new char[width] {0};
     }
 
     Generate();
@@ -17,9 +17,9 @@ Maze::Maze(size_t width, size_t height) {
 
 Maze::~Maze() {
     for (size_t i = 0; i < height_; i++) {
-        delete[] arr_[i];
+        delete[] array_[i];
     }
-    delete[] arr_;
+    delete[] array_;
 }
 
 void Maze::Print()
@@ -29,7 +29,7 @@ void Maze::Print()
     for (int i = 0; i < height_; i++)
     {
         for (int j = 0; j < width_; j++)
-            cout << (char)arr_[i][j];
+            cout << (char)array_[i][j];
         cout << '\n';
     }
     cout << '\n';
@@ -44,11 +44,11 @@ void Maze::Generate()
 
     for (int i = 0; i < height_; i++)
         for (int j = 0; j < width_; j++)
-            arr_[i][j] = WALL;
+            array_[i][j] = WALL;
 
     while (count < 10000)
     {
-        arr_[y][x] = SPACE;
+        array_[y][x] = SPACE;
         count++;
 
         while (true) {
@@ -57,34 +57,34 @@ void Maze::Generate()
             {
             case 0:
                 if (y != 1)
-                    if (arr_[y - 2][x] == WALL)  // Вверх
+                    if (array_[y - 2][x] == WALL)  // Вверх
                     {
-                        arr_[y - 1][x] = SPACE;
-                        arr_[y - 2][x] = SPACE;
+                        array_[y - 1][x] = SPACE;
+                        array_[y - 2][x] = SPACE;
                         y -= 2;
                     }
             case 1:
                 if (y != height_ - 2)
-                    if (arr_[y + 2][x] == WALL)  // Вниз
+                    if (array_[y + 2][x] == WALL)  // Вниз
                     {
-                        arr_[y + 1][x] = SPACE;
-                        arr_[y + 2][x] = SPACE;
+                        array_[y + 1][x] = SPACE;
+                        array_[y + 2][x] = SPACE;
                         y += 2;
                     }
             case 2:
                 if (x != 1)
-                    if (arr_[y][x - 2] == WALL)  // Налево
+                    if (array_[y][x - 2] == WALL)  // Налево
                     {
-                        arr_[y][x - 1] = SPACE;
-                        arr_[y][x - 2] = SPACE;
+                        array_[y][x - 1] = SPACE;
+                        array_[y][x - 2] = SPACE;
                         x -= 2;
                     }
             case 3:
                 if (x != width_ - 2)
-                    if (arr_[y][x + 2] == WALL)  // Направо
+                    if (array_[y][x + 2] == WALL)  // Направо
                     {
-                        arr_[y][x + 1] = SPACE;
-                        arr_[y][x + 2] = SPACE;
+                        array_[y][x + 1] = SPACE;
+                        array_[y][x + 2] = SPACE;
                         x += 2;
                     }
             }
@@ -97,7 +97,7 @@ void Maze::Generate()
             {
                 x = 2 * (rand() % ((width_ - 1) / 2)) + 1;
                 y = 2 * (rand() % ((height_ - 1) / 2)) + 1;
-            } while (arr_[y][x] != SPACE);
+            } while (array_[y][x] != SPACE);
         }
     }
 
@@ -112,28 +112,28 @@ bool Maze::DeadEnd(int x, int y)
 
     if (x != 1)
     {
-        if (arr_[y][x - 2] == SPACE)
+        if (array_[y][x - 2] == SPACE)
             a += 1;
     }
     else a += 1;
 
     if (y != 1)
     {
-        if (arr_[y - 2][x] == SPACE)
+        if (array_[y - 2][x] == SPACE)
             a += 1;
     }
     else a += 1;
 
     if (x != width_ - 2)
     {
-        if (arr_[y][x + 2] == SPACE)
+        if (array_[y][x + 2] == SPACE)
             a += 1;
     }
     else a += 1;
 
     if (y != height_ - 2)
     {
-        if (arr_[y + 2][x] == SPACE)
+        if (array_[y + 2][x] == SPACE)
             a += 1;
     }
     else a += 1;
@@ -157,7 +157,7 @@ void Maze::RemoveDeadend(int x, int y)
         {
             continue;
         }
-        if (arr_[y + dy][x + dx] == ' ')
+        if (array_[y + dy][x + dx] == ' ')
         {
             count++;
         }
@@ -172,9 +172,9 @@ void Maze::RemoveDeadend(int x, int y)
             {
                 continue;
             }
-            if (arr_[y + dy][x + dx] != ' ')
+            if (array_[y + dy][x + dx] != ' ')
             {
-                arr_[y + dy][x + dx] = ' ';
+                array_[y + dy][x + dx] = ' ';
                 break;
             }
         }
@@ -186,6 +186,6 @@ void Maze::RemoveDeadends()
 {
     for (int i = 0; i < height_; i++)
         for (int j = 0; j < width_; j++)
-            if (arr_[i][j] == ' ')
+            if (array_[i][j] == ' ')
                 RemoveDeadend(j, i);
 }
