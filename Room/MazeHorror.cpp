@@ -32,7 +32,7 @@ struct Maniac {
 
 double ManiacDist(Maniac maniac);
 
-double*** current_cube = new double** [6];
+std::vector < std::vector < std::vector <double> > > current_cube(6);
 
 double mapwidth = 31;
 double mapheight = 31;
@@ -62,12 +62,11 @@ ISound* sound2;
 
 void Move(const Direction direction);
 
-double** RotatePolygon(double** polygon, double verts_amount, double angle, bool axis_y = true)
+std::vector <std::vector<double>> RotatePolygon(std::vector <std::vector<double>> polygon, double verts_amount, double angle, bool axis_y = true)
 {
-	double** new_polygon = new double* [verts_amount];
+	std::vector <std::vector<double>> new_polygon(verts_amount, std::vector <double>(3));
 	for (int i = 0; i < verts_amount; i++)
 	{
-		new_polygon[i] = new double[3];
 		double x = polygon[i][0];
 		double y = polygon[i][1];
 		double z = polygon[i][2];
@@ -87,7 +86,7 @@ double** RotatePolygon(double** polygon, double verts_amount, double angle, bool
 			new_polygon[i][2] = new_z;
 		}
 	}
-	/*delete[] polygon;*/
+
 	return new_polygon;
 }
 
@@ -115,8 +114,8 @@ double ManiacDist(Maniac maniac)
 }
 
 struct Point {
-	int x;
-	int y;
+	double x;
+	double y;
 };
 
 char** field = nullptr;
@@ -126,33 +125,42 @@ double dist(double pt_x, double pt_y, double X, double Y) {
 	double y = Y - pt_y;
 	return sqrt(x * x + y * y);
 }
+Point normalize(double x, double y) {
+	if (field[int(y)][int(x - 1)] == '#') { x += 0.5; };
+	if (field[int(y)][int(x + 1)] == '#') { x -= 0.5; };
+	if (field[int(y - 1)][int(x)] == '#') { y += 0.5; };
+	if (field[int(y + 1)][int(x)] == '#') { y -= 0.5; };
+	return { x,y };
+}
 void check_cells(Maniac& maniac) {
-	Point current_position = {(maniac.x),(maniac.y) };
+	Point current_position = { maniac.x,maniac.y };
 	Point cell{ 0,0 };
 	double distance;
 	double dx, dy, cosine, sine;
-	double minDist = sqrt(mapheight*mapheight + mapwidth*mapwidth);
+	double minDist = sqrt(mapheight * mapheight + mapwidth * mapwidth);
 	for (int i = 0; i < 3; i++) {
 		for (int j = 0; j < 3; j++) {
 			// TODO: Fix that behavior, wrong algoritm
-			
-			cell.y = current_position.y + i - 1;
-			cell.x = current_position.x + j - 1;
+			cell.y = int(current_position.y) + i - 1;
+			cell.x = int(current_position.x) + j - 1;
+
 			// Handler that doesnt accept error indexes
 			if (cell.y < 0 || cell.y >= mapheight
 				|| cell.x < 0 || cell.x >= mapwidth) {
 				continue;
 			}
-			if (field[cell.y][cell.x] == '#' or (i == 1 and j == 1)) {
+			
+			if (field[int(cell.y)][int(cell.x)] == '#' || (i == 1 && j == 1)) {
 				continue;
 			}
+			cell = normalize(floor(cell.x), floor(cell.y));
 			distance = dist(maniac.point_x, maniac.point_y, cell.x, cell.y);
 			if (minDist > distance) {
 				minDist = distance;
 				sine = (cell.y - maniac.y) / dist(maniac.x, maniac.y, cell.x, cell.y);
 				cosine = (cell.x - maniac.x) / dist(maniac.x, maniac.y, cell.x, cell.y);
-				dx = dS * cosine / 10;
-				dy = dS * sine / 10;
+				dx = dS * cosine / 5;
+				dy = dS * sine / 5;
 
 			}
 			
@@ -160,8 +168,8 @@ void check_cells(Maniac& maniac) {
 	}
 	maniac.dx = dx;
 	maniac.dy = dy;
-
 }
+
 void switch_way(Maniac& maniac, int X, int Y) {
 	if (field[Y + 1][X] == ' ')
 	{
@@ -308,7 +316,7 @@ void maniac_Move(Maniac &maniac) {
 
 void stuck_in_the_wall(Maniac& maniac) {
 	Point maniac_coordinates = { maniac.x, maniac.y };
-	if (field[maniac_coordinates.y][maniac_coordinates.x] == '#') {
+	if (field[int(maniac_coordinates.y)][int(maniac_coordinates.x)] == '#') {
 		for (int i = int(maniac.y) < 1 ? 0 : maniac.y - 1; i < int(maniac.y) + 2; i++) {
 			for (int j = int(maniac.x) < 1 ? 0 : maniac.x - 1; j < int(maniac.x) + 2; j++) {
 				if (field[i][j] == ' ') {
@@ -365,7 +373,7 @@ void MoveManiac(Maniac& maniac)
 
 
 
-void DrawCuboid(double xr, double yr, double zr, double x0, double y0, double z0, double width_x, double width_y, double width_z, double *fillcolor, double *outcolor, bool legs_or_hands = false, bool forward = false)
+void DrawCuboid(double xr, double yr, double zr, double x0, double y0, double z0, double width_x, double width_y, double width_z, std::vector <double> fillcolor, std::vector <double> outcolor, bool legs_or_hands = false, bool forward = false)
 {
 	double x1 = x0-width_x / 2;
 	double y1 = y0-width_y / 2;
@@ -373,30 +381,28 @@ void DrawCuboid(double xr, double yr, double zr, double x0, double y0, double z0
 	double x2 = x0 + width_x / 2;
 	double y2 = y0+width_y / 2;
 	double z2 = z0+width_z / 2;
+	std::vector <std::vector<double>> points(8, std::vector<double>(3));
 
-	double* point1 = new double[3]{ x1, y1, z1 };
-	double* point2 = new double[3]{ x1, y2, z1 };
-	double* point3 = new double[3]{ x2, y2, z1 };
-	double* point4 = new double[3]{ x2, y1, z1 };
-
-	double* point5 = new double[3]{ x1, y1, z2 };
-	double* point6 = new double[3]{ x1, y2, z2 };
-	double* point7 = new double[3]{ x2, y2, z2 };
-	double* point8 = new double[3]{ x2, y1, z2 };
-
-	double*** trunk = new double** [6];
-
+	points[0] = { x1, y1, z1 };
+	points[1] = { x1, y2, z1 };
+	points[2] = { x2, y2, z1 };
+	points[3] = { x2, y1, z1 };
+	points[4] = { x1, y1, z2 };
+	points[5] = { x1, y2, z2 };
+	points[6] = { x2, y2, z2 };
+	points[7] = { x2, y1, z2 };
+	std::vector <std::vector <std::vector<double>>> trunk(6);
 	if (legs_or_hands)
 	{
 		double angle;
 		if (forward) angle = maniac.rha;
 		else angle = -maniac.rha;
-		trunk[0] = RotatePolygon(new double* [4]{ point1, point2, point3, point4 }, 4, angle, false);
-		trunk[1] = RotatePolygon(new double* [4]{ point5, point6, point7, point8 }, 4, angle, false);
-		trunk[2] = RotatePolygon(new double* [4]{ point6, point2, point3, point7 }, 4, angle, false);
-		trunk[3] = RotatePolygon(new double* [4]{ point5, point1, point4, point8 }, 4, angle, false);
-		trunk[4] = RotatePolygon(new double* [4]{ point6, point2, point1, point5 }, 4, angle, false);
-		trunk[5] = RotatePolygon(new double* [4]{ point7, point3, point4, point8 }, 4, angle, false);
+		trunk[0] = RotatePolygon(std::vector <std::vector<double>> { points[0], points[1], points[2], points[3] }, 4, angle, false);
+		trunk[1] = RotatePolygon(std::vector <std::vector<double>> { points[4], points[5], points[6], points[7] }, 4, angle, false);
+		trunk[2] = RotatePolygon(std::vector <std::vector<double>> { points[5], points[1], points[2], points[6] }, 4, angle, false);
+		trunk[3] = RotatePolygon(std::vector <std::vector<double>> { points[4], points[0], points[3], points[7] }, 4, angle, false);
+		trunk[4] = RotatePolygon(std::vector <std::vector<double>> { points[5], points[1], points[0], points[4] }, 4, angle, false);
+		trunk[5] = RotatePolygon(std::vector <std::vector<double>> { points[6], points[2], points[3], points[7] }, 4, angle, false);
 
 		for (int i = 0; i < 6; i++)
 		{
@@ -405,12 +411,12 @@ void DrawCuboid(double xr, double yr, double zr, double x0, double y0, double z0
 	}
 	else
 	{
-		trunk[0] = RotatePolygon(new double* [4]{ point1, point2, point3, point4 }, 4, maniac.rot_angle);
-		trunk[1] = RotatePolygon(new double* [4]{ point5, point6, point7, point8 }, 4, maniac.rot_angle);
-		trunk[2] = RotatePolygon(new double* [4]{ point6, point2, point3, point7 }, 4, maniac.rot_angle);
-		trunk[3] = RotatePolygon(new double* [4]{ point5, point1, point4, point8 }, 4, maniac.rot_angle);
-		trunk[4] = RotatePolygon(new double* [4]{ point6, point2, point1, point5 }, 4, maniac.rot_angle);
-		trunk[5] = RotatePolygon(new double* [4]{ point7, point3, point4, point8 }, 4, maniac.rot_angle);
+		trunk[0] = RotatePolygon({ points[0], points[1], points[2], points[3] }, 4, maniac.rot_angle);
+		trunk[1] = RotatePolygon({ points[4], points[5], points[6], points[7] }, 4, maniac.rot_angle);
+		trunk[2] = RotatePolygon({ points[5], points[1], points[2], points[6] }, 4, maniac.rot_angle);	
+		trunk[3] = RotatePolygon({ points[4], points[0], points[3], points[7] }, 4, maniac.rot_angle);
+		trunk[4] = RotatePolygon({ points[5], points[1], points[0], points[4] }, 4, maniac.rot_angle);
+		trunk[5] = RotatePolygon({ points[6], points[2], points[3], points[7] }, 4, maniac.rot_angle);
 	}
 
 	glBegin(GL_LINE_LOOP);
@@ -440,20 +446,6 @@ void DrawCuboid(double xr, double yr, double zr, double x0, double y0, double z0
 	}
 
 	glEnd();
-	//delete[] point1;
-	//delete[] point2; 
-	//delete[] point3,
-	//delete[] point4;
-	//delete[] point5; 
-	//delete[] point6; 
-	//delete[] point7; 
-	//delete[] point8; 
-	//for (int i = 0; i < 6; i++) {
-	//	delete[] trunk[i];
-	//}
-	//delete[] trunk;
-	//delete[] fillcolor;
-	//delete[] outcolor;
 }
 
 void DrawManiac(Maniac maniac)
@@ -462,22 +454,22 @@ void DrawManiac(Maniac maniac)
 	double Sy = player_y - maniac.y;
 	
 	//Trunk
-	DrawCuboid(Sy * wallwidth, -wallheight / 12, Sx * wallwidth, 0, 0, 0, wallwidth / 2, wallheight / 3, wallwidth / 2, new double[3]{0.9, 0.7, 0.7}, new double[3]{1, 0.5, 0.5});
+	DrawCuboid(Sy * wallwidth, -wallheight / 12, Sx * wallwidth, 0, 0, 0, wallwidth / 2, wallheight / 3, wallwidth / 2, std::vector <double>{0.9, 0.7, 0.7}, std::vector <double>{1, 0.5, 0.5});
 
 	//Head
-	DrawCuboid(Sy * wallwidth, wallheight / 7, Sx * wallwidth, 0, 0, 0, wallheight / 12, wallheight / 12, wallheight / 12, new double[3]{ 0.9, 0.7, 0.7 }, new double[3]{ 1, 0.5, 0.5 });
+	DrawCuboid(Sy * wallwidth, wallheight / 7, Sx * wallwidth, 0, 0, 0, wallheight / 12, wallheight / 12, wallheight / 12, std::vector <double>{ 0.9, 0.7, 0.7 }, std::vector <double>{ 1, 0.5, 0.5 });
 
 	//Eyes
-	DrawCuboid(Sy * wallwidth, wallheight / 7, Sx * wallwidth, -wallheight / 48, wallheight / 48, -wallheight / 24, wallheight / 48, wallheight / 48, wallheight / 96, new double[3]{ 0, 0, 0 }, new double[3]{ 1, 0, 0 });
-	DrawCuboid(Sy * wallwidth, wallheight / 7, Sx * wallwidth, wallheight / 48, wallheight / 48, -wallheight / 24, wallheight / 48, wallheight / 48, wallheight / 96, new double[3]{ 0, 0, 0 }, new double[3]{ 1, 0, 0 });
+	DrawCuboid(Sy * wallwidth, wallheight / 7, Sx * wallwidth, -wallheight / 48, wallheight / 48, -wallheight / 24, wallheight / 48, wallheight / 48, wallheight / 96, std::vector <double>{ 0, 0, 0 }, std::vector <double>{ 1, 0, 0 });
+	DrawCuboid(Sy * wallwidth, wallheight / 7, Sx * wallwidth, wallheight / 48, wallheight / 48, -wallheight / 24, wallheight / 48, wallheight / 48, wallheight / 96, std::vector <double>{ 0, 0, 0 }, std::vector <double>{ 1, 0, 0 });
 
 	//Legs
-	DrawCuboid(Sy * wallwidth + wallwidth / 20, -wallheight / 12 - wallheight / 6, Sx * wallwidth, wallwidth / 8, -wallheight / 12, 0, wallwidth / 4, wallheight / 6, wallwidth / 4, new double[3]{ 0.9, 0.7, 0.7 }, new double[3]{ 1, 0.5, 0.5 }, true, true);
-	DrawCuboid(Sy * wallwidth - wallwidth / 20, -wallheight / 12 - wallheight / 6, Sx * wallwidth, -wallwidth / 8, -wallheight / 12, 0, wallwidth / 4, wallheight / 6, wallwidth / 4, new double[3]{ 0.9, 0.7, 0.7 }, new double[3]{ 1, 0.5, 0.5 }, true, false);
+	DrawCuboid(Sy * wallwidth + wallwidth / 20, -wallheight / 12 - wallheight / 6, Sx * wallwidth, wallwidth / 8, -wallheight / 12, 0, wallwidth / 4, wallheight / 6, wallwidth / 4, std::vector <double>{ 0.9, 0.7, 0.7 }, std::vector <double>{ 1, 0.5, 0.5 }, true, true);
+	DrawCuboid(Sy * wallwidth - wallwidth / 20, -wallheight / 12 - wallheight / 6, Sx * wallwidth, -wallwidth / 8, -wallheight / 12, 0, wallwidth / 4, wallheight / 6, wallwidth / 4, std::vector <double>{ 0.9, 0.7, 0.7 }, std::vector <double>{ 1, 0.5, 0.5 }, true, false);
 
 	//Hands
-	DrawCuboid(Sy * wallwidth + wallwidth / 4, wallheight / 12, Sx * wallwidth, wallwidth / 8, -wallheight / 6, 0, wallwidth / 8, wallheight / 4, wallwidth / 8, new double[3]{ 0.9, 0.7, 0.7 }, new double[3]{ 1, 0.5, 0.5 }, true, false);
-	DrawCuboid(Sy * wallwidth - wallwidth / 4, wallheight / 12, Sx * wallwidth, -wallwidth / 8, -wallheight / 6, 0, wallwidth / 8, wallheight / 4, wallwidth / 8, new double[3]{ 0.9, 0.7, 0.7 }, new double[3]{ 1, 0.5, 0.5 }, true, true);
+	DrawCuboid(Sy * wallwidth + wallwidth / 4, wallheight / 12, Sx * wallwidth, wallwidth / 8, -wallheight / 6, 0, wallwidth / 8, wallheight / 4, wallwidth / 8, std::vector <double>{ 0.9, 0.7, 0.7 }, std::vector <double>{ 1, 0.5, 0.5 }, true, false);
+	DrawCuboid(Sy * wallwidth - wallwidth / 4, wallheight / 12, Sx * wallwidth, -wallwidth / 8, -wallheight / 6, 0, wallwidth / 8, wallheight / 4, wallwidth / 8, std::vector <double>{ 0.9, 0.7, 0.7 }, std::vector <double>{ 1, 0.5, 0.5 }, true, true);
 }
 
 
@@ -609,24 +601,23 @@ void update_cube(double x, double y, bool roof, bool floor)
 	if (roof) y2 = y1 + wallwidth;
 	else if (floor) y2 = -wallheight / 2;
 	double z2 = z1 + wallwidth;
-	double** points = new double*[9];
-	points[1] = new double[3]{ x1, y1, z1 };
-	points[2] = new double[3]{ x1, y2, z1 };
-	points[3] = new double[3]{ x2, y2, z1 };
-	points[4] = new double[3]{ x2, y1, z1 };
+	std::vector <std::vector <double>> points(8);
+	points[0] = { x1, y1, z1 };
+	points[1] = { x1, y2, z1 };
+	points[2] = { x2, y2, z1 };
+	points[3] = { x2, y1, z1 };
 
-	points[5] = new double[3]{ x1, y1, z2 };
-	points[6] = new double[3]{ x1, y2, z2 };
-	points[7] = new double[3]{ x2, y2, z2 };
-	points[8] = new double[3]{ x2, y1, z2 };
+	points[4] = { x1, y1, z2 };
+	points[5] = { x1, y2, z2 };
+	points[6] = { x2, y2, z2 };
+	points[7] = { x2, y1, z2 };
 
-	current_cube[0] = new double* [4]{ points[1], points[2], points[3], points[4] };
-	current_cube[1] = new double* [4]{ points[5], points[6], points[7], points[8] };
-	current_cube[2] = new double* [4]{ points[6], points[2], points[3], points[7] };
-	current_cube[3] = new double* [4]{ points[5], points[1], points[4], points[8] };
-	current_cube[4] = new double* [4]{ points[6], points[2], points[1], points[5] };
-	current_cube[5] = new double* [4]{ points[7], points[3], points[4], points[8] };
-	// delete[] points;
+	current_cube[0] = { points[0], points[1], points[2], points[3] };
+	current_cube[1] = { points[4], points[5], points[6], points[7] };
+	current_cube[2] = { points[5], points[1], points[2], points[6] };
+	current_cube[3] = { points[4], points[0], points[3], points[7] };
+	current_cube[4] = { points[5], points[1], points[0], points[4] };
+	current_cube[5] = { points[6], points[2], points[3], points[7] };
 }
 
 void DrawCube(int x, int y, bool roof, bool floor, double shade)
