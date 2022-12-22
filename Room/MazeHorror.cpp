@@ -12,8 +12,7 @@
 #include <GL/freeglut.h>
 #include <SDL2/sdl.h>
 // END GRAPHICS
-#include <irrKlang.h>
-
+#include <SDL2/SDL_mixer.h>
 #include "Direction.h"
 #include "Maze.h"
 
@@ -21,7 +20,10 @@
 
 #define DEV
 
-using namespace irrklang;
+const char* SOUND_BENZOPILA = "Sounds/benzopila.wav";
+const char* SOUND_KRIK = "Sounds/krik.wav";
+const char* SOUND_SCARY = "Sounds/scary_sound.wav";
+
 #define rha right_hand_angle
 
 bool wall_collision(double player_x, double player_y);
@@ -63,9 +65,10 @@ int chckpntsnum = 6;
 
 Maniac maniac = { {1, 4}, 0, 0, 0, 0 };
 
-ISoundEngine* engine = createIrrKlangDevice();
-ISound* sound = engine->play2D("Sounds/scary_sound.mp3", true, true, false, ESM_AUTO_DETECT, true);
-ISound* sound2;
+Mix_Chunk* soundScary;
+Mix_Chunk* soundKrik;
+Mix_Chunk* soundBenzopila;
+
 
 void Move(const Direction direction);
 
@@ -497,8 +500,6 @@ void InitGraphics()
 void OnDied() {
 	if (count == 220)
 	{
-		sound->stop();
-		sound2->stop();
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glClearDepth(0);
 		glDepthFunc(GL_GREATER);
@@ -507,6 +508,12 @@ void OnDied() {
 	}
 
 	count++;
+
+	Mix_VolumeChunk(soundBenzopila, 64);
+	Mix_PlayChannel(-1, soundBenzopila, 1);
+
+	Mix_VolumeChunk(soundKrik, 32);
+	Mix_PlayChannel(-1, soundKrik, 1);
 
 	glClearDepth(0);
 	glDepthFunc(GL_GREATER);
@@ -546,9 +553,7 @@ void render()
 
 	DrawManiac(maniac);
 	double S = ManiacDist(maniac);
-	double volume = 1 / (1 + S);
-	sound->setVolume(volume);
-	sound->setIsPaused(false);
+	
 	MoveManiac(maniac);
 
 	for (int x = 0; x < mapwidth; x++)
@@ -578,13 +583,6 @@ void render()
 	}
 	if (ManiacDist(maniac) <= 1) {
 		died = true;
-		sound->stop();
-		sound = engine->play2D("Sounds/benzopila.wav", true, true, false, ESM_AUTO_DETECT, true);
-		sound->setVolume(1);
-		sound->setIsPaused(false);
-		sound2 = engine->play2D("Sounds/krik.mp3", true, true, false, ESM_AUTO_DETECT, true);
-		sound2->setVolume(0.5);
-		sound2->setIsPaused(false);
 	}
 }
 
@@ -805,7 +803,15 @@ int SDL_main(int argc, char ** argv) {
 	srand(time(NULL));
 #endif
 	Maze maze(31, 31);
-	
+	Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048);
+
+	soundScary = Mix_LoadWAV(SOUND_SCARY);
+	soundKrik = Mix_LoadWAV(SOUND_KRIK);
+	soundBenzopila = Mix_LoadWAV(SOUND_BENZOPILA);
+
+	Mix_VolumeChunk(soundScary, 32);
+	Mix_PlayChannel(-1, soundScary, -1);
+
 	field = new char*[maze.height()];
 	for (size_t i = 0; i < maze.height(); i++) {
 		field[i] = new char[maze.width()];
@@ -833,7 +839,7 @@ int SDL_main(int argc, char ** argv) {
 	SDL_Window* window = InitWindow(screen_width, screen_height);
 
 	SDL_Event event;
-
+	
 	for (;;) {
 		SDL_PollEvent(&event);
 		
