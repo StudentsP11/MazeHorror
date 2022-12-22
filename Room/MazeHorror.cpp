@@ -26,8 +26,15 @@ using namespace irrklang;
 
 bool wall_collision(double player_x, double player_y);
 
+struct Point {
+	double x;
+	double y;
+};
+
 struct Maniac {
-	double x, y, rot_angle, right_hand_angle, dx, dy, point_x, point_y;
+	Point position;
+	double rot_angle, right_hand_angle, point_x, point_y;
+
 };
 
 double ManiacDist(Maniac maniac);
@@ -54,7 +61,7 @@ int count = 0;
 double check_points[6][2] = { {20, 1}, {20, 17}, {1, 7}, {1, 10}, {1, 1}, {1, 20} };
 int chckpntsnum = 6;
 
-Maniac maniac = { 1, 4, 0, 0, 0, 0, 0, 0 };
+Maniac maniac = { {1, 4}, 0, 0, 0, 0 };
 
 ISoundEngine* engine = createIrrKlangDevice();
 ISound* sound = engine->play2D("Sounds/scary_sound.mp3", true, true, false, ESM_AUTO_DETECT, true);
@@ -94,12 +101,12 @@ std::vector <std::vector<double>> RotatePolygon(std::vector <std::vector<double>
 
 bool sees(Maniac maniac)
 {
-	double y = player_y - maniac.y;
-	double x = player_x - maniac.x;
+	double y = player_y - maniac.position.y;
+	double x = player_x - maniac.position.x;
 	double tg = y / x;
-	for (double X = std::min(maniac.x, player_x); X < std::max(maniac.x, player_x); X += 0.5)
+	for (double X = std::min(maniac.position.x, player_x); X < std::max(maniac.position.x, player_x); X += 0.5)
 	{
-		double Y = maniac.y + tg * (X - std::min(maniac.x, player_x));
+		double Y = maniac.position.y + tg * (X - std::min(maniac.position.x, player_x));
 		if (wall_collision(X, Y))
 			return false;
 	}
@@ -108,15 +115,10 @@ bool sees(Maniac maniac)
 
 double ManiacDist(Maniac maniac)
 {
-	double x = maniac.x - player_x;
-	double y = maniac.y - player_y;
+	double x = maniac.position.x - player_x;
+	double y = maniac.position.y - player_y;
 	return sqrt(x * x + y * y);
 }
-
-struct Point {
-	double x;
-	double y;
-};
 
 char** field = nullptr;
 
@@ -132,8 +134,8 @@ Point normalize(double x, double y) {
 	if (field[int(y + 1)][int(x)] == '#') { y -= 0.5; };
 	return { x,y };
 }
-void check_cells(Maniac& maniac) {
-	Point current_position = { maniac.x,maniac.y };
+Point check_cells(Maniac& maniac) {
+	Point current_position = { maniac.position.x,maniac.position.y };
 	Point cell{ 0,0 };
 	double distance;
 	double dx, dy, cosine, sine;
@@ -149,7 +151,7 @@ void check_cells(Maniac& maniac) {
 				|| cell.x < 0 || cell.x >= mapwidth) {
 				continue;
 			}
-			
+
 			if (field[int(cell.y)][int(cell.x)] == '#' || (i == 1 && j == 1)) {
 				continue;
 			}
@@ -157,94 +159,92 @@ void check_cells(Maniac& maniac) {
 			distance = dist(maniac.point_x, maniac.point_y, cell.x, cell.y);
 			if (minDist > distance) {
 				minDist = distance;
-				sine = (cell.y - maniac.y) / dist(maniac.x, maniac.y, cell.x, cell.y);
-				cosine = (cell.x - maniac.x) / dist(maniac.x, maniac.y, cell.x, cell.y);
+				sine = (cell.y - maniac.position.y) / dist(maniac.position.x, maniac.position.y, cell.x, cell.y);
+				cosine = (cell.x - maniac.position.x) / dist(maniac.position.x, maniac.position.y, cell.x, cell.y);
 				dx = dS * cosine / 5;
 				dy = dS * sine / 5;
 
 			}
-			
+
 		}
 	}
-	maniac.dx = dx;
-	maniac.dy = dy;
+		return { dx, dy };
 }
-
-void switch_way(Maniac& maniac, int X, int Y) {
-	if (field[Y + 1][X] == ' ')
-	{
-		if (maniac.dx > 0) {
-			int chosen_way = rand() % 3;
-			if (chosen_way == 0) {
-				while (field[Y][X] != ' ') {
-					X -= 1;
-				}
-			}
-			else {
-				while (field[Y][X] != ' ') {
-					X += 1;
-				}
-			}
-
-		}
-		if (maniac.dx < 0) {
-			int chosen_way = rand() % 3;
-			if (chosen_way == 0) {
-				while (field[Y][X] != ' ') {
-					X += 1;
-				}
-			}
-			else {
-				while (field[Y][X] != ' ') {
-					X -= 1;
-				}
-			}
-		}
-		int sine1 = (Y - maniac.y) / ManiacDist(maniac);
-		int cosine1 = (X - maniac.x) / ManiacDist(maniac);
-		maniac.dx = dS * cosine1 / 5;
-		maniac.dy = 0;
-
-	}
-	else if(field[Y][X + 1] == ' ') {
-		if (maniac.dy > 0) {
-			int chosen_way = rand() % 3;
-			if (chosen_way == 0) {
-				while (field[Y][X] != ' ') {
-					Y -= 1;
-				}
-			}
-			else {
-				while (field[Y][X] != ' ') {
-					Y += 1;
-				}
-			}
-		}
-		else {
-			int chosen_way = rand() % 3;
-			if (chosen_way == 0) {
-				while (field[Y][X] != ' ') {
-					Y += 1;
-				}
-			}
-			else {
-				while (field[Y][X] != ' ') {
-					Y -= 1;
-				}
-			}
-		}
-		int sine1 = (Y - maniac.y) / ManiacDist(maniac);
-		int cosine1 = (X - maniac.x) / ManiacDist(maniac);
-		maniac.dx = dS * cosine1 / 5;
-		maniac.dy = 0;
-	}
-}
-
-void check_checkpoints(Maniac& maniac) {
+//
+//void switch_way(Maniac& maniac, int X, int Y) {
+//	if (field[Y + 1][X] == ' ')
+//	{
+//		if (maniac.dx > 0) {
+//			int chosen_way = rand() % 3;
+//			if (chosen_way == 0) {
+//				while (field[Y][X] != ' ') {
+//					X -= 1;
+//				}
+//			}
+//			else {
+//				while (field[Y][X] != ' ') {
+//					X += 1;
+//				}
+//			}
+//
+//		}
+//		if (maniac.dx < 0) {
+//			int chosen_way = rand() % 3;
+//			if (chosen_way == 0) {
+//				while (field[Y][X] != ' ') {
+//					X += 1;
+//				}
+//			}
+//			else {
+//				while (field[Y][X] != ' ') {
+//					X -= 1;
+//				}
+//			}
+//		}
+//		int sine1 = (Y - maniac.position.y) / ManiacDist(maniac);
+//		int cosine1 = (X - maniac.position.x) / ManiacDist(maniac);
+//		maniac.dx = dS * cosine1 / 5;
+//		maniac.dy = 0;
+//
+//	}
+//	else if(field[Y][X + 1] == ' ') {
+//		if (maniac.dy > 0) {
+//			int chosen_way = rand() % 3;
+//			if (chosen_way == 0) {
+//				while (field[Y][X] != ' ') {
+//					Y -= 1;
+//				}
+//			}
+//			else {
+//				while (field[Y][X] != ' ') {
+//					Y += 1;
+//				}
+//			}
+//		}
+//		else {
+//			int chosen_way = rand() % 3;
+//			if (chosen_way == 0) {
+//				while (field[Y][X] != ' ') {
+//					Y += 1;
+//				}
+//			}
+//			else {
+//				while (field[Y][X] != ' ') {
+//					Y -= 1;
+//				}
+//			}
+//		}
+//		int sine1 = (Y - maniac.position.y) / ManiacDist(maniac);
+//		int cosine1 = (X - maniac.position.x) / ManiacDist(maniac);
+//		maniac.dx = dS * cosine1 / 5;
+//		maniac.dy = 0;
+//	}
+//}
+Point check_checkpoints(Maniac& maniac) {
 	double sine, cosine, dx, dy;
 	int index = rand() % chckpntsnum;
-	double a = check_points[index][0] - maniac.x;
-	double b = check_points[index][1] - maniac.y;
+	double a = check_points[index][0] - maniac.position.x;
+	double b = check_points[index][1] - maniac.position.y;
 	double S = sqrt(a * a + b * b);
 	cosine = a / S;
 	sine = b / S;
@@ -257,32 +257,31 @@ void check_checkpoints(Maniac& maniac) {
 	dy = dS * sine / 10;
 	maniac.point_x = check_points[index][0];
 	maniac.point_y = check_points[index][1];
-	maniac.dx = dx;
-	maniac.dy = dy;
+	return { dx,dy };
 }
 
 
 //void check_cells(Maniac& maniac) {
-//	int x = ceil(maniac.x);
-//	int y = ceil(maniac.y);
+//	int x = ceil(maniac.position.x);
+//	int y = ceil(maniac.position.y);
 //	Point central_cell = { x, y };
 //	int standing[3][3];
-//	if (maniac.y < 1) {
+//	if (maniac.position.y < 1) {
 //		for (int i = 0; i < 3; i++) {
 //			standing[0][i] = -1;
 //		}
 //	}
-//	if (maniac.y > mapheight - 1) {
+//	if (maniac.position.y > mapheight - 1) {
 //		for (int i = 0; i < 3; i++) {
 //			standing[2][i] = -1;
 //		}
 //	}
-//	if (maniac.x < 1) {
+//	if (maniac.position.x < 1) {
 //		for (int i = 0; i < 3; i++) {
 //			standing[i][0] = -1;
 //		}
 //	}
-//	if (maniac.x > mapwidth - 1) {
+//	if (maniac.position.x > mapwidth - 1) {
 //		for (int i = 0; i < 3; i++) {
 //			standing[i][2] = -1;
 //		}
@@ -290,10 +289,10 @@ void check_checkpoints(Maniac& maniac) {
 //	//sqrt(x * x + y * y);
 //	int minDist = sqrt(mapwidth * mapwidth + mapheight * mapheight);
 //	int min_x = mapheight, min_y = mapwidth;
-//	for (int i = int(maniac.y) < 1 ? 0 : maniac.y - 1; i < int(maniac.y) + 2; i++) {
-//		for (int j = int(maniac.x) < 1 ? 0 : maniac.x - 1; j < int(maniac.x) + 2; j++) {
-//			if (field[i][j] != '#' and standing[i - int(maniac.y) + 1][j - int(maniac.x) + 1] != -1) {
-//				standing[i - int(maniac.y) + 1][j - int(maniac.x) + 1] = dist(maniac.point_x, maniac.point_y, j, i);
+//	for (int i = int(maniac.position.y) < 1 ? 0 : maniac.position.y - 1; i < int(maniac.position.y) + 2; i++) {
+//		for (int j = int(maniac.position.x) < 1 ? 0 : maniac.position.x - 1; j < int(maniac.position.x) + 2; j++) {
+//			if (field[i][j] != '#' and standing[i - int(maniac.position.y) + 1][j - int(maniac.position.x) + 1] != -1) {
+//				standing[i - int(maniac.position.y) + 1][j - int(maniac.position.x) + 1] = dist(maniac.point_x, maniac.point_y, j, i);
 //				if (minDist > standing[i - y + 1][j - x + 1]) {
 //					minDist = standing[i - y + 1][j - x + 1];
 //					min_x = j;
@@ -302,26 +301,26 @@ void check_checkpoints(Maniac& maniac) {
 //			}
 //		}
 //	}
-//	double sine = (double(min_y) - maniac.y) / dist(maniac.x, maniac.y, min_x, min_y);
-//	double cosine = (double(min_x) - maniac.x) / dist(maniac.x, maniac.y, min_x, min_y);
+//	double sine = (double(min_y) - maniac.position.y) / dist(maniac.position.x, maniac.position.y, min_x, min_y);
+//	double cosine = (double(min_x) - maniac.position.x) / dist(maniac.position.x, maniac.position.y, min_x, min_y);
 //	maniac.dx = dS * cosine / 5;
 //	maniac.dy = dS * sine / 5;
 //}
 
-void maniac_Move(Maniac &maniac) {
-	maniac.x += maniac.dx;
-	maniac.y += maniac.dy;
+void maniac_Move(Maniac &maniac, Point delta) {
+	maniac.position.x += delta.x;
+	maniac.position.y += delta.y;
 	
 }
 
 void stuck_in_the_wall(Maniac& maniac) {
-	Point maniac_coordinates = { maniac.x, maniac.y };
+	Point maniac_coordinates = { maniac.position.x, maniac.position.y };
 	if (field[int(maniac_coordinates.y)][int(maniac_coordinates.x)] == '#') {
-		for (int i = int(maniac.y) < 1 ? 0 : maniac.y - 1; i < int(maniac.y) + 2; i++) {
-			for (int j = int(maniac.x) < 1 ? 0 : maniac.x - 1; j < int(maniac.x) + 2; j++) {
+		for (int i = int(maniac.position.y) < 1 ? 0 : maniac.position.y - 1; i < int(maniac.position.y) + 2; i++) {
+			for (int j = int(maniac.position.x) < 1 ? 0 : maniac.position.x - 1; j < int(maniac.position.x) + 2; j++) {
 				if (field[i][j] == ' ') {
-					maniac.x = j;
-					maniac.y = i;
+					maniac.position.x = j;
+					maniac.position.y = i;
 				}
 			}
 		}
@@ -343,13 +342,13 @@ void MoveManiac(Maniac& maniac)
 		maniac.right_hand_angle = -pi / 4;
 		k = 1;
 	}
-
+	Point delta;
 
 
 	if (sees(maniac)) {
-		double sine, cosine, dx, dy;
-		sine = (player_y - maniac.y) / ManiacDist(maniac);
-		cosine = (player_x - maniac.x) / ManiacDist(maniac);
+		double sine, cosine;
+		sine = (player_y - maniac.position.y) / ManiacDist(maniac);
+		cosine = (player_x - maniac.position.x) / ManiacDist(maniac);
 		double angle = asin(sine);
 		if (cosine > 0 && cos(angle) < 0 || cosine < 0 && cos(angle) > 0)
 			angle = pi - angle;
@@ -359,21 +358,22 @@ void MoveManiac(Maniac& maniac)
 
 	}
 	else {
-		double x = maniac.x - maniac.point_x;
-		double y = maniac.y - maniac.point_y;
+		double x = maniac.position.x - maniac.point_x;
+		double y = maniac.position.y - maniac.point_y;
 		if ((x * x + y * y) <= 0.01) {
 			int index = rand() % chckpntsnum;
 			maniac.point_x = check_points[index][0];
 			maniac.point_y = check_points[index][1];
 		}
 	}
-	check_cells(maniac);
-	maniac_Move(maniac);
+	delta = check_cells(maniac);
+	maniac_Move(maniac, delta);
 }
 
 
 
-void DrawCuboid(double xr, double yr, double zr, double x0, double y0, double z0, double width_x, double width_y, double width_z, std::vector <double> fillcolor, std::vector <double> outcolor, bool legs_or_hands = false, bool forward = false)
+void DrawCuboid(double xr, double yr, double zr, double x0, double y0, double z0, double width_x, 
+	double width_y, double width_z, std::vector <double> fillcolor, std::vector <double> outcolor, bool legs_or_hands = false, bool forward = false)
 {
 	double x1 = x0-width_x / 2;
 	double y1 = y0-width_y / 2;
@@ -450,8 +450,8 @@ void DrawCuboid(double xr, double yr, double zr, double x0, double y0, double z0
 
 void DrawManiac(Maniac maniac)
 {
-	double Sx = maniac.x - player_x;
-	double Sy = player_y - maniac.y;
+	double Sx = maniac.position.x - player_x;
+	double Sy = player_y - maniac.position.y;
 	
 	//Trunk
 	DrawCuboid(Sy * wallwidth, -wallheight / 12, Sx * wallwidth, 0, 0, 0, wallwidth / 2, wallheight / 3, wallwidth / 2, std::vector <double>{0.9, 0.7, 0.7}, std::vector <double>{1, 0.5, 0.5});
@@ -559,8 +559,8 @@ void render()
 			double shade;
 			double a = x - player_x;
 			double b = y - player_y;
-			double a2 = x - maniac.x;
-			double b2 = y - maniac.y;
+			double a2 = x - maniac.position.x;
+			double b2 = y - maniac.position.y;
 			if (cell == '#')
 			{
 				double S = sqrt(a * a + b * b);
