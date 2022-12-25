@@ -2,8 +2,6 @@
 #define MAZE_H
 
 #include <iostream>
-#include <cstdlib>
-#include <ctime>
 
 class Maze
 {
@@ -14,36 +12,26 @@ public:
         SPACE = ' ',
     };
 
-    void Print(); //Печать лабиринта
+    void Print() const; //Печать лабиринта
 
     Maze(size_t width, size_t height);
 
     ~Maze();
 
-    char* operator[](size_t height_index) {
-        if (height_index < 0 || height_index > height_ - 1)
-            throw std::out_of_range("Index is out of boundaries");
-        return array_[height_index];
-    }
+    [[nodiscard]] char* operator[](size_t height_index) const;
 
-    const char const* const* array() const {
-        return array_;
-    };
+    [[nodiscard]] const char * const* array() const;
+    
+    [[nodiscard]] const size_t& height() const;
 
-    const size_t& height() const {
-        return height_;
-    }
-
-    const size_t& width() const {
-        return width_;
-    }
+    [[nodiscard]] const size_t& width() const;
 private:
     size_t height_, width_;
     char** array_;
 
     void Generate(); //Создание лабиринта
-    void RemoveDeadend(int x, int y);
-    void RemoveDeadends();
+    void RemoveDeadEnd(int x, int y);
+    void RemoveDeadEnds();
     bool DeadEnd(int x, int y);
 };
 

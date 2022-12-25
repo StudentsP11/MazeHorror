@@ -12,6 +12,8 @@
 #include <GL/freeglut.h>
 #include <SDL2/sdl.h>
 // END GRAPHICS
+#include <numeric>
+#include <valarray>
 #include <SDL2/SDL_mixer.h>
 #include "Direction.h"
 #include "Maze.h"
@@ -39,12 +41,12 @@ struct Maniac {
 
 };
 
-double ManiacDist(Maniac maniac);
+double ManiacDist(const Maniac& maniac);
 
 std::vector < std::vector < std::vector <double> > > current_cube(6);
 
-double mapwidth = 31;
-double mapheight = 31;
+size_t map_width = 31;
+size_t map_height = 31;
 double wallwidth = 0.5;
 double wallheight = 3;
 double player_x = 1;
@@ -72,9 +74,13 @@ Mix_Chunk* soundBenzopila;
 
 void Move(const Direction direction);
 
-std::vector <std::vector<double>> RotatePolygon(std::vector <std::vector<double>> polygon, double verts_amount, double angle, bool axis_y = true)
+std::vector <std::vector<double>> RotatePolygon(
+	const std::vector<std::vector<double>>& polygon,
+	const double verts_amount,
+	const double angle,
+	const bool axis_y = true)
 {
-	std::vector <std::vector<double>> new_polygon(verts_amount, std::vector <double>(3));
+	std::vector new_polygon(verts_amount, std::vector<double>(3));
 	for (int i = 0; i < verts_amount; i++)
 	{
 		double x = polygon[i][0];
@@ -102,7 +108,7 @@ std::vector <std::vector<double>> RotatePolygon(std::vector <std::vector<double>
 
 
 
-bool sees(Maniac maniac)
+bool sees(const Maniac& maniac)
 {
 	double y = player_y - maniac.position.y;
 	double x = player_x - maniac.position.x;
@@ -116,7 +122,7 @@ bool sees(Maniac maniac)
 	return true;
 }
 
-double ManiacDist(Maniac maniac)
+double ManiacDist(const Maniac& maniac)
 {
 	double x = maniac.position.x - player_x;
 	double y = maniac.position.y - player_y;
@@ -130,40 +136,34 @@ double dist(double pt_x, double pt_y, double X, double Y) {
 	double y = Y - pt_y;
 	return sqrt(x * x + y * y);
 }
-Point normalize(double x, double y) {
-	if (field[int(y)][int(x - 1)] == '#') { x += 0.5; };
-	if (field[int(y)][int(x + 1)] == '#') { x -= 0.5; };
-	if (field[int(y - 1)][int(x)] == '#') { y += 0.5; };
-	if (field[int(y + 1)][int(x)] == '#') { y -= 0.5; };
-	return { x,y };
-}
+
 Point check_cells(Maniac& maniac) {
-	Point current_position = { maniac.position.x,maniac.position.y };
-	Point cell{ 0,0 };
-	double distance;
-	double dx, dy, cosine, sine;
-	double minDist = sqrt(mapheight * mapheight + mapwidth * mapwidth);
+	const Point current_position = { maniac.position.x,maniac.position.y };
+	double dx = 0, dy = 0;
+	double minDist = SDL_sqrt(static_cast<double>(map_height * map_height + map_width * map_width));
 	for (int i = 0; i < 3; i++) {
 		for (int j = 0; j < 3; j++) {
-			// TODO: Fix that behavior, wrong algoritm
-			cell.y = int(current_position.y) + i - 1;
-			cell.x = int(current_position.x) + j - 1;
+			// TODO: Fix that behavior, wrong algorithm
+			const size_t y = static_cast<size_t>(current_position.y) + i - 1;
+			const size_t x = static_cast<size_t>(current_position.x) + j - 1;
 
 			// Handler that doesnt accept error indexes
-			if (cell.y < 0 || cell.y >= mapheight
-				|| cell.x < 0 || cell.x >= mapwidth) {
+			if (y >= map_height
+				|| x >= map_width) {
 				continue;
 			}
 
-			if (field[int(cell.y)][int(cell.x)] == '#' || (i == 1 && j == 1)) {
+			if (field[y][x] == '#' || (i == 1 && j == 1)) {
 				continue;
 			}
-			cell = normalize(floor(cell.x), floor(cell.y));
-			distance = dist(maniac.point_x, maniac.point_y, cell.x, cell.y);
+			
+			const double distance = dist(maniac.point_x, maniac.point_y,
+				static_cast<double>(x), static_cast<double>(y));
 			if (minDist > distance) {
 				minDist = distance;
-				sine = (cell.y - maniac.position.y) / dist(maniac.position.x, maniac.position.y, cell.x, cell.y);
-				cosine = (cell.x - maniac.position.x) / dist(maniac.position.x, maniac.position.y, cell.x, cell.y);
+
+				const double sine = (y - maniac.position.y) / dist(maniac.position.x, maniac.position.y, x, y);
+				const double cosine = (x - maniac.position.x) / dist(maniac.position.x, maniac.position.y, x, y);
 				dx = dS * cosine / 5;
 				dy = dS * sine / 5;
 
@@ -171,7 +171,8 @@ Point check_cells(Maniac& maniac) {
 
 		}
 	}
-		return { dx, dy };
+
+	return { dx, dy };
 }
 //
 //void switch_way(Maniac& maniac, int X, int Y) {
@@ -244,20 +245,20 @@ Point check_cells(Maniac& maniac) {
 //	}
 //}
 Point check_checkpoints(Maniac& maniac) {
-	double sine, cosine, dx, dy;
-	int index = rand() % chckpntsnum;
-	double a = check_points[index][0] - maniac.position.x;
-	double b = check_points[index][1] - maniac.position.y;
-	double S = sqrt(a * a + b * b);
-	cosine = a / S;
-	sine = b / S;
+
+	const size_t index = rand() % chckpntsnum;
+	const double a = check_points[index][0] - maniac.position.x;
+	const double b = check_points[index][1] - maniac.position.y;
+	const double S = sqrt(a * a + b * b);
+	const double cosine = a / S;
+	const double sine = b / S;
 	double angle = asin(sine);
 	if (cosine > 0 && cos(angle) < 0 || cosine < 0 && cos(angle) > 0)
 		angle = pi - angle;
 	maniac.rot_angle = pi - angle;
 
-	dx = dS * cosine / 10;
-	dy = dS * sine / 10;
+	const double dx = dS * cosine / 10;
+	const double dy = dS * sine / 10;
 	maniac.point_x = check_points[index][0];
 	maniac.point_y = check_points[index][1];
 	return { dx,dy };
@@ -274,7 +275,7 @@ Point check_checkpoints(Maniac& maniac) {
 //			standing[0][i] = -1;
 //		}
 //	}
-//	if (maniac.position.y > mapheight - 1) {
+//	if (maniac.position.y > map_height - 1) {
 //		for (int i = 0; i < 3; i++) {
 //			standing[2][i] = -1;
 //		}
@@ -284,14 +285,14 @@ Point check_checkpoints(Maniac& maniac) {
 //			standing[i][0] = -1;
 //		}
 //	}
-//	if (maniac.position.x > mapwidth - 1) {
+//	if (maniac.position.x > map_width - 1) {
 //		for (int i = 0; i < 3; i++) {
 //			standing[i][2] = -1;
 //		}
 //	}
 //	//sqrt(x * x + y * y);
-//	int minDist = sqrt(mapwidth * mapwidth + mapheight * mapheight);
-//	int min_x = mapheight, min_y = mapwidth;
+//	int minDist = sqrt(map_width * map_width + map_height * map_height);
+//	int min_x = map_height, min_y = map_width;
 //	for (int i = int(maniac.position.y) < 1 ? 0 : maniac.position.y - 1; i < int(maniac.position.y) + 2; i++) {
 //		for (int j = int(maniac.position.x) < 1 ? 0 : maniac.position.x - 1; j < int(maniac.position.x) + 2; j++) {
 //			if (field[i][j] != '#' and standing[i - int(maniac.position.y) + 1][j - int(maniac.position.x) + 1] != -1) {
@@ -310,14 +311,14 @@ Point check_checkpoints(Maniac& maniac) {
 //	maniac.dy = dS * sine / 5;
 //}
 
-void maniac_Move(Maniac &maniac, Point delta) {
+void maniac_Move(Maniac &maniac, const Point delta) {
 	maniac.position.x += delta.x;
 	maniac.position.y += delta.y;
 	
 }
 
 void stuck_in_the_wall(Maniac& maniac) {
-	Point maniac_coordinates = { maniac.position.x, maniac.position.y };
+	const Point maniac_coordinates = { maniac.position.x, maniac.position.y };
 	if (field[int(maniac_coordinates.y)][int(maniac_coordinates.x)] == '#') {
 		for (int i = int(maniac.position.y) < 1 ? 0 : maniac.position.y - 1; i < int(maniac.position.y) + 2; i++) {
 			for (int j = int(maniac.position.x) < 1 ? 0 : maniac.position.x - 1; j < int(maniac.position.x) + 2; j++) {
@@ -333,7 +334,6 @@ void stuck_in_the_wall(Maniac& maniac) {
 
 void MoveManiac(Maniac& maniac)
 {
-
 	maniac.rha += k * pi / 60;
 	if (maniac.rha > pi / 4)
 	{
@@ -345,8 +345,6 @@ void MoveManiac(Maniac& maniac)
 		maniac.right_hand_angle = -pi / 4;
 		k = 1;
 	}
-	Point delta;
-
 
 	if (sees(maniac)) {
 		double sine, cosine;
@@ -369,14 +367,14 @@ void MoveManiac(Maniac& maniac)
 			maniac.point_y = check_points[index][1];
 		}
 	}
-	delta = check_cells(maniac);
+	Point delta = check_cells(maniac);
 	maniac_Move(maniac, delta);
 }
 
 
 
 void DrawCuboid(double xr, double yr, double zr, double x0, double y0, double z0, double width_x, 
-	double width_y, double width_z, std::vector <double> fillcolor, std::vector <double> outcolor, bool legs_or_hands = false, bool forward = false)
+	double width_y, double width_z, std::vector<double> fillcolor, std::vector<double> outcolor, bool legs_or_hands = false, bool forward = false)
 {
 	double x1 = x0-width_x / 2;
 	double y1 = y0-width_y / 2;
@@ -384,7 +382,7 @@ void DrawCuboid(double xr, double yr, double zr, double x0, double y0, double z0
 	double x2 = x0 + width_x / 2;
 	double y2 = y0+width_y / 2;
 	double z2 = z0+width_z / 2;
-	std::vector <std::vector<double>> points(8, std::vector<double>(3));
+	std::vector points(8, std::vector<double>(3));
 
 	points[0] = { x1, y1, z1 };
 	points[1] = { x1, y2, z1 };
@@ -394,18 +392,18 @@ void DrawCuboid(double xr, double yr, double zr, double x0, double y0, double z0
 	points[5] = { x1, y2, z2 };
 	points[6] = { x2, y2, z2 };
 	points[7] = { x2, y1, z2 };
-	std::vector <std::vector <std::vector<double>>> trunk(6);
+	std::vector<std::vector<std::vector<double>>> trunk(6);
 	if (legs_or_hands)
 	{
 		double angle;
 		if (forward) angle = maniac.rha;
 		else angle = -maniac.rha;
-		trunk[0] = RotatePolygon(std::vector <std::vector<double>> { points[0], points[1], points[2], points[3] }, 4, angle, false);
-		trunk[1] = RotatePolygon(std::vector <std::vector<double>> { points[4], points[5], points[6], points[7] }, 4, angle, false);
-		trunk[2] = RotatePolygon(std::vector <std::vector<double>> { points[5], points[1], points[2], points[6] }, 4, angle, false);
-		trunk[3] = RotatePolygon(std::vector <std::vector<double>> { points[4], points[0], points[3], points[7] }, 4, angle, false);
-		trunk[4] = RotatePolygon(std::vector <std::vector<double>> { points[5], points[1], points[0], points[4] }, 4, angle, false);
-		trunk[5] = RotatePolygon(std::vector <std::vector<double>> { points[6], points[2], points[3], points[7] }, 4, angle, false);
+		trunk[0] = RotatePolygon(std::vector<std::vector<double>> { points[0], points[1], points[2], points[3] }, 4, angle, false);
+		trunk[1] = RotatePolygon(std::vector<std::vector<double>> { points[4], points[5], points[6], points[7] }, 4, angle, false);
+		trunk[2] = RotatePolygon(std::vector<std::vector<double>> { points[5], points[1], points[2], points[6] }, 4, angle, false);
+		trunk[3] = RotatePolygon(std::vector<std::vector<double>> { points[4], points[0], points[3], points[7] }, 4, angle, false);
+		trunk[4] = RotatePolygon(std::vector<std::vector<double>> { points[5], points[1], points[0], points[4] }, 4, angle, false);
+		trunk[5] = RotatePolygon(std::vector<std::vector<double>> { points[6], points[2], points[3], points[7] }, 4, angle, false);
 
 		for (int i = 0; i < 6; i++)
 		{
@@ -556,9 +554,9 @@ void render()
 	
 	MoveManiac(maniac);
 
-	for (int x = 0; x < mapwidth; x++)
+	for (int x = 0; x < map_width; x++)
 	{
-		for (int y = 0; y < mapheight; y++)
+		for (int y = 0; y < map_height; y++)
 		{
 			char cell = field[y][x];
 			double shade;
@@ -673,9 +671,9 @@ double degrees_to_radians(double angle)
 bool wall_collision(double player_x, double player_y)
 {
 	const double collision_border = 0.5;
-	for (int x = 0; x < mapwidth; x++)
+	for (int x = 0; x < map_width; x++)
 	{
-		for (int y = 0; y < mapheight; y++)
+		for (int y = 0; y < map_height; y++)
 		{
 			char cell = field[y][x];
 			if (cell == Maze::WALL)
@@ -810,7 +808,7 @@ int SDL_main(int argc, char ** argv) {
 	soundBenzopila = Mix_LoadWAV(SOUND_BENZOPILA);
 
 	Mix_VolumeChunk(soundScary, 32);
-	Mix_PlayChannel(-1, soundScary, -1);
+	const int maniacMusicChannel = Mix_PlayChannel(-1, soundScary, -1);
 
 	field = new char*[maze.height()];
 	for (size_t i = 0; i < maze.height(); i++) {
@@ -850,6 +848,13 @@ int SDL_main(int argc, char ** argv) {
 
 		SDL_GetWindowSize(window, &screen_width, &screen_height);
 		reshape(screen_width, screen_height);
+		
+		const double maniacDistance = std::abs(ManiacDist(maniac));
+		const uint8_t maniacSoundDistance = maniacDistance > 255 ? 255 : maniacDistance;
+		
+		Mix_SetPosition(maniacMusicChannel,
+			std::atan2(maniac.position.y-player_y, maniac.position.x-player_x),
+			maniacSoundDistance);
 
 		render();
 
