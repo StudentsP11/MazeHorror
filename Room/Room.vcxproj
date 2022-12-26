@@ -164,7 +164,6 @@
   <ItemGroup>
     <ClInclude Include="Direction.h" />
     <ClInclude Include="Maze.h" />
-    <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="MazeHorror.rc" />
@@ -173,14 +172,15 @@
     <Media Include="Sounds\benzopila.wav">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Media>
-    <Media Include="Sounds\krik.mp3">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+  </ItemGroup>
+  <ItemGroup>
+    <Media Include="Sounds\krik.wav">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Media>
-    <Media Include="Sounds\scary_sound.mp3">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
-      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    <Media Include="Sounds\scary_sound.wav">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Media>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

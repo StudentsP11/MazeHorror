@@ -22,7 +22,29 @@ Maze::~Maze() {
     delete[] array_;
 }
 
-void Maze::Print()
+[[nodiscard]] char* Maze::operator[](size_t height_index) const
+{
+    if (height_index < 0 || height_index > height_ - 1)
+        throw std::out_of_range("Index is out of boundaries");
+    return array_[height_index];
+}
+
+[[nodiscard]] const char * const* Maze::array() const
+{
+    return array_;
+}
+
+[[nodiscard]] const size_t& Maze::height() const
+{
+    return height_;
+}
+
+[[nodiscard]] const size_t& Maze::width() const
+{
+    return width_;
+}
+
+void Maze::Print() const
 {
     using std::cout;
 
@@ -103,7 +125,7 @@ void Maze::Generate()
 
     
 
-    RemoveDeadends();
+    RemoveDeadEnds();
 }
 
 bool Maze::DeadEnd(int x, int y)
@@ -144,7 +166,7 @@ bool Maze::DeadEnd(int x, int y)
         return 0;
 }
 
-void Maze::RemoveDeadend(int x, int y)
+void Maze::RemoveDeadEnd(int x, int y)
 {
     const int directions[4][2] = { {0, 1}, {0, -1}, {1, 0}, {-1, 0} };
     int non_possible_deadends_count = 0;
@@ -182,10 +204,10 @@ void Maze::RemoveDeadend(int x, int y)
 
 }
 
-void Maze::RemoveDeadends()
+void Maze::RemoveDeadEnds()
 {
     for (int i = 0; i < height_; i++)
         for (int j = 0; j < width_; j++)
             if (array_[i][j] == ' ')
-                RemoveDeadend(j, i);
+                RemoveDeadEnd(j, i);
 }
