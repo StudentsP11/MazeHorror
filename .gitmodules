@@ -1,0 +1,8 @@
+[submodule "externals/SDL"]
+	path = externals/SDL
+	url = https://github.com/libsdl-org/SDL
+	branch = release-2.26.x
+[submodule "externals/SDL_mixer"]
+	path = externals/SDL_mixer
+	url = https://github.com/libsdl-org/SDL_mixer
+	branch = release-2.6.x
