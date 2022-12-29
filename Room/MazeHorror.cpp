@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <map>
 #include <vector>
+#include <array>
 
 // GRAPHICS (DO NOT TOUCH)
 #include <GL/glew.h>
@@ -22,50 +23,91 @@
 
 #define DEV
 
-const char* SOUND_BENZOPILA = "Sounds/benzopila.wav";
-const char* SOUND_KRIK = "Sounds/krik.wav";
-const char* SOUND_SCARY = "Sounds/scary_sound.wav";
+template<std::size_t X, std::size_t Y, std::size_t Z>
+using matrix3d = std::array<std::array<std::array<double, Z>, Y>, X>;
 
-#define rha right_hand_angle
+template<std::size_t X, std::size_t Y>
+using matrix2d = std::array<std::array<double, Y>, X>;
 
 bool wall_collision(double player_x, double player_y);
 
-struct Point {
+struct vec2d {
 	double x;
 	double y;
 };
 
-struct Maniac {
-	Point position;
-	double rot_angle, right_hand_angle, point_x, point_y;
+struct GameObject {
+	vec2d position;
+	vec2d size{ 0, 0 };
+};
 
+struct Entity {
+	GameObject object;
+	double viewDirectionAngle;
+};
+
+struct Maniac {
+	Entity entity;
+	double rightHandAngle, point_x, point_y;
+};
+
+struct Player {
+	Entity entity;
+	bool is_died = false;
 };
 
 double ManiacDist(const Maniac& maniac);
 
-std::vector < std::vector < std::vector <double> > > current_cube(6);
+const char* SOUND_BENZOPILA = "Sounds/benzopila.wav";
+const char* SOUND_KRIK = "Sounds/krik.wav";
+const char* SOUND_SCARY = "Sounds/scary_sound.wav";
 
-size_t map_width = 31;
-size_t map_height = 31;
-double wallwidth = 0.5;
-double wallheight = 3;
-double player_x = 1;
-double player_y = 8;
-double pi = acos(0) * 2;
-double dA = 5;
-double dS = 0.05;
-int Cw = 1000;
-int Ch = 1000;
-double rotation_angle = 0;
-double d0 = 0.25;
+const size_t map_width = 31;
+const size_t map_height = 31;
+const double wall_width = 0.5;
+const double wall_height = 3;
+const double pi = acos(0) * 2;
+const double angleDelta = 5;
+const double speedDelta = 0.05;
+const double d0 = 0.25;
+
 int k = 1;
-bool died = false;
+
 int count = 0;
 
-double check_points[6][2] = { {20, 1}, {20, 17}, {1, 7}, {1, 10}, {1, 1}, {1, 20} };
-int chckpntsnum = 6;
+char** field = nullptr;
 
-Maniac maniac = { {1, 4}, 0, 0, 0, 0 };
+const int check_points_number = 6;
+const double check_points[check_points_number][2] = { 
+	{20, 1}, {20, 17}, {1, 7}, 
+	{1, 10}, {1, 1}, {1, 20} 
+};
+
+ matrix3d<6,4,3> current_cube;
+
+Maniac maniac { 
+	.entity {
+		.object {
+			.position {1, 4}, 
+			.size {1,1}
+		}, 
+		.viewDirectionAngle { 0 }
+	}, 
+	.rightHandAngle { 0 },
+	.point_x { 0 },
+	.point_y { 0 }
+};
+
+Player player {
+	.entity {
+		.object {
+			.position {1, 1},
+			.size {1,1}
+		},
+		.viewDirectionAngle { 0 }
+	},
+	.is_died { false }
+};
 
 Mix_Chunk* soundScary;
 Mix_Chunk* soundKrik;
@@ -75,7 +117,7 @@ Mix_Chunk* soundBenzopila;
 void Move(const Direction direction);
 
 std::vector <std::vector<double>> RotatePolygon(
-	const std::vector<std::vector<double>>& polygon,
+	const matrix2d<4, 3> & polygon,
 	const double verts_amount,
 	const double angle,
 	const bool axis_y = true)
@@ -106,46 +148,54 @@ std::vector <std::vector<double>> RotatePolygon(
 	return new_polygon;
 }
 
-
-
-bool sees(const Maniac& maniac)
+[[nodiscard]] bool GameObject_Sees(
+	const GameObject& game_object1, 
+	const GameObject& game_object2) 
 {
-	double y = player_y - maniac.position.y;
-	double x = player_x - maniac.position.x;
-	double tg = y / x;
-	for (double X = std::min(maniac.position.x, player_x); X < std::max(maniac.position.x, player_x); X += 0.5)
+	const double tg =
+		(game_object1.position.y - game_object2.position.y)
+		/ (game_object1.position.x - game_object2.position.y);
+	const vec2d min_position = {
+		std::min(game_object2.position.x, game_object1.position.x),
+		std::min(game_object2.position.y, game_object1.position.y)
+	};
+	const vec2d	max_position = {
+		std::max(game_object2.position.x, game_object1.position.x),
+		0
+	};
+
+	for (double x = min_position.x; x < max_position.x; x += 0.5)
 	{
-		double Y = maniac.position.y + tg * (X - std::min(maniac.position.x, player_x));
-		if (wall_collision(X, Y))
+		double y = game_object2.position.y + tg * (x - min_position.x);
+		if (wall_collision(x, y))
 			return false;
 	}
+
 	return true;
 }
 
-double ManiacDist(const Maniac& maniac)
+[[nodiscard]] inline double vec2d_Dist(const vec2d& vec1, const vec2d& vec2)
 {
-	double x = maniac.position.x - player_x;
-	double y = maniac.position.y - player_y;
-	return sqrt(x * x + y * y);
+	const double x = vec1.x - vec2.x;
+	const double y = vec1.y - vec2.y;
+	return SDL_sqrt(x * x + y * y);
 }
 
-char** field = nullptr;
+vec2d check_cells(const Maniac& maniac) {
+	const vec2d position = { 
+		maniac.entity.object.position.x,
+		maniac.entity.object.position.y 
+	};
 
-double dist(double pt_x, double pt_y, double X, double Y) {
-	double x = X - pt_x;
-	double y = Y - pt_y;
-	return sqrt(x * x + y * y);
-}
-
-Point check_cells(Maniac& maniac) {
-	const Point current_position = { maniac.position.x,maniac.position.y };
 	double dx = 0, dy = 0;
-	double minDist = SDL_sqrt(static_cast<double>(map_height * map_height + map_width * map_width));
+	double minDist = SDL_sqrt(static_cast<double>(
+		map_height * map_height + map_width * map_width
+	));
 	for (int i = 0; i < 3; i++) {
 		for (int j = 0; j < 3; j++) {
 			// TODO: Fix that behavior, wrong algorithm
-			const size_t y = static_cast<size_t>(current_position.y) + i - 1;
-			const size_t x = static_cast<size_t>(current_position.x) + j - 1;
+			const size_t y = static_cast<size_t>(position.y) + i - 1;
+			const size_t x = static_cast<size_t>(position.x) + j - 1;
 
 			// Handler that doesnt accept error indexes
 			if (y >= map_height
@@ -157,224 +207,92 @@ Point check_cells(Maniac& maniac) {
 				continue;
 			}
 			
-			const double distance = dist(maniac.point_x, maniac.point_y,
-				static_cast<double>(x), static_cast<double>(y));
+			const double distance = vec2d_Dist(
+				{ maniac.point_x, maniac.point_y },
+				{ static_cast<double>(x), static_cast<double>(y) }
+			);
 			if (minDist > distance) {
 				minDist = distance;
 
-				const double sine = (y - maniac.position.y) / dist(maniac.position.x, maniac.position.y, x, y);
-				const double cosine = (x - maniac.position.x) / dist(maniac.position.x, maniac.position.y, x, y);
-				dx = dS * cosine / 5;
-				dy = dS * sine / 5;
-
+				const double sine = (y - position.y) 
+					/ vec2d_Dist(
+						{ position.x, position.y },
+						{ static_cast<double>(x), static_cast<double>(y) }
+					);
+				const double cosine = (x - position.x)
+					/ vec2d_Dist(
+						{ position.x, position.y },
+						{ static_cast<double>(x), static_cast<double>(y) }
+					);
+				dx = speedDelta * cosine / 5;
+				dy = speedDelta * sine / 5;
 			}
-
 		}
 	}
 
 	return { dx, dy };
 }
-//
-//void switch_way(Maniac& maniac, int X, int Y) {
-//	if (field[Y + 1][X] == ' ')
-//	{
-//		if (maniac.dx > 0) {
-//			int chosen_way = rand() % 3;
-//			if (chosen_way == 0) {
-//				while (field[Y][X] != ' ') {
-//					X -= 1;
-//				}
-//			}
-//			else {
-//				while (field[Y][X] != ' ') {
-//					X += 1;
-//				}
-//			}
-//
-//		}
-//		if (maniac.dx < 0) {
-//			int chosen_way = rand() % 3;
-//			if (chosen_way == 0) {
-//				while (field[Y][X] != ' ') {
-//					X += 1;
-//				}
-//			}
-//			else {
-//				while (field[Y][X] != ' ') {
-//					X -= 1;
-//				}
-//			}
-//		}
-//		int sine1 = (Y - maniac.position.y) / ManiacDist(maniac);
-//		int cosine1 = (X - maniac.position.x) / ManiacDist(maniac);
-//		maniac.dx = dS * cosine1 / 5;
-//		maniac.dy = 0;
-//
-//	}
-//	else if(field[Y][X + 1] == ' ') {
-//		if (maniac.dy > 0) {
-//			int chosen_way = rand() % 3;
-//			if (chosen_way == 0) {
-//				while (field[Y][X] != ' ') {
-//					Y -= 1;
-//				}
-//			}
-//			else {
-//				while (field[Y][X] != ' ') {
-//					Y += 1;
-//				}
-//			}
-//		}
-//		else {
-//			int chosen_way = rand() % 3;
-//			if (chosen_way == 0) {
-//				while (field[Y][X] != ' ') {
-//					Y += 1;
-//				}
-//			}
-//			else {
-//				while (field[Y][X] != ' ') {
-//					Y -= 1;
-//				}
-//			}
-//		}
-//		int sine1 = (Y - maniac.position.y) / ManiacDist(maniac);
-//		int cosine1 = (X - maniac.position.x) / ManiacDist(maniac);
-//		maniac.dx = dS * cosine1 / 5;
-//		maniac.dy = 0;
-//	}
-//}
-Point check_checkpoints(Maniac& maniac) {
 
-	const size_t index = rand() % chckpntsnum;
-	const double a = check_points[index][0] - maniac.position.x;
-	const double b = check_points[index][1] - maniac.position.y;
-	const double S = sqrt(a * a + b * b);
-	const double cosine = a / S;
-	const double sine = b / S;
-	double angle = asin(sine);
-	if (cosine > 0 && cos(angle) < 0 || cosine < 0 && cos(angle) > 0)
-		angle = pi - angle;
-	maniac.rot_angle = pi - angle;
-
-	const double dx = dS * cosine / 10;
-	const double dy = dS * sine / 10;
-	maniac.point_x = check_points[index][0];
-	maniac.point_y = check_points[index][1];
-	return { dx,dy };
+vec2d vec2d_Sum(const vec2d & vec1, const vec2d & vec2) {
+	return {
+		vec1.x + vec2.x,
+		vec1.y + vec2.y
+	};
 }
 
-
-//void check_cells(Maniac& maniac) {
-//	int x = ceil(maniac.position.x);
-//	int y = ceil(maniac.position.y);
-//	Point central_cell = { x, y };
-//	int standing[3][3];
-//	if (maniac.position.y < 1) {
-//		for (int i = 0; i < 3; i++) {
-//			standing[0][i] = -1;
-//		}
-//	}
-//	if (maniac.position.y > map_height - 1) {
-//		for (int i = 0; i < 3; i++) {
-//			standing[2][i] = -1;
-//		}
-//	}
-//	if (maniac.position.x < 1) {
-//		for (int i = 0; i < 3; i++) {
-//			standing[i][0] = -1;
-//		}
-//	}
-//	if (maniac.position.x > map_width - 1) {
-//		for (int i = 0; i < 3; i++) {
-//			standing[i][2] = -1;
-//		}
-//	}
-//	//sqrt(x * x + y * y);
-//	int minDist = sqrt(map_width * map_width + map_height * map_height);
-//	int min_x = map_height, min_y = map_width;
-//	for (int i = int(maniac.position.y) < 1 ? 0 : maniac.position.y - 1; i < int(maniac.position.y) + 2; i++) {
-//		for (int j = int(maniac.position.x) < 1 ? 0 : maniac.position.x - 1; j < int(maniac.position.x) + 2; j++) {
-//			if (field[i][j] != '#' and standing[i - int(maniac.position.y) + 1][j - int(maniac.position.x) + 1] != -1) {
-//				standing[i - int(maniac.position.y) + 1][j - int(maniac.position.x) + 1] = dist(maniac.point_x, maniac.point_y, j, i);
-//				if (minDist > standing[i - y + 1][j - x + 1]) {
-//					minDist = standing[i - y + 1][j - x + 1];
-//					min_x = j;
-//					min_y = i;
-//				}
-//			}
-//		}
-//	}
-//	double sine = (double(min_y) - maniac.position.y) / dist(maniac.position.x, maniac.position.y, min_x, min_y);
-//	double cosine = (double(min_x) - maniac.position.x) / dist(maniac.position.x, maniac.position.y, min_x, min_y);
-//	maniac.dx = dS * cosine / 5;
-//	maniac.dy = dS * sine / 5;
-//}
-
-void maniac_Move(Maniac &maniac, const Point delta) {
-	maniac.position.x += delta.x;
-	maniac.position.y += delta.y;
-	
-}
-
-void stuck_in_the_wall(Maniac& maniac) {
-	const Point maniac_coordinates = { maniac.position.x, maniac.position.y };
-	if (field[int(maniac_coordinates.y)][int(maniac_coordinates.x)] == '#') {
-		for (int i = int(maniac.position.y) < 1 ? 0 : maniac.position.y - 1; i < int(maniac.position.y) + 2; i++) {
-			for (int j = int(maniac.position.x) < 1 ? 0 : maniac.position.x - 1; j < int(maniac.position.x) + 2; j++) {
-				if (field[i][j] == ' ') {
-					maniac.position.x = j;
-					maniac.position.y = i;
-				}
-			}
-		}
-	}
-}
-
-
-void MoveManiac(Maniac& maniac)
+void Maniac_Move(Maniac& maniac, const vec2d& player_position)
 {
-	maniac.rha += k * pi / 60;
-	if (maniac.rha > pi / 4)
+	maniac.rightHandAngle += k * pi / 60;
+	if (maniac.rightHandAngle > pi / 4)
 	{
-		maniac.rha = pi / 4;
+		maniac.rightHandAngle = pi / 4;
 		k = -1;
 	}
-	else if (maniac.rha < -pi / 4)
+	else if (maniac.rightHandAngle < -pi / 4)
 	{
-		maniac.right_hand_angle = -pi / 4;
+		maniac.rightHandAngle = -pi / 4;
 		k = 1;
 	}
 
-	if (sees(maniac)) {
+	if (GameObject_Sees(maniac.entity.object, 
+		player.entity.object)) 
+	{
 		double sine, cosine;
-		sine = (player_y - maniac.position.y) / ManiacDist(maniac);
-		cosine = (player_x - maniac.position.x) / ManiacDist(maniac);
+		sine = (player_position.y - maniac.entity.object.position.y) 
+			/ ManiacDist(maniac);
+		cosine = (player_position.x - maniac.entity.object.position.x) 
+			/ ManiacDist(maniac);
 		double angle = asin(sine);
 		if (cosine > 0 && cos(angle) < 0 || cosine < 0 && cos(angle) > 0)
 			angle = pi - angle;
-		maniac.rot_angle = pi - angle;
-		maniac.point_x = player_x;
-		maniac.point_y = player_y;
-
+		maniac.entity.viewDirectionAngle = pi - angle;
+		maniac.point_x = player_position.x;
+		maniac.point_y = player_position.y;
 	}
 	else {
-		double x = maniac.position.x - maniac.point_x;
-		double y = maniac.position.y - maniac.point_y;
+		double x = maniac.entity.object.position.x - maniac.point_x;
+		double y = maniac.entity.object.position.y - maniac.point_y;
 		if ((x * x + y * y) <= 0.01) {
-			int index = rand() % chckpntsnum;
+			int index = rand() % check_points_number;
 			maniac.point_x = check_points[index][0];
 			maniac.point_y = check_points[index][1];
 		}
 	}
-	Point delta = check_cells(maniac);
-	maniac_Move(maniac, delta);
+
+	vec2d delta = check_cells(maniac);
+
+	maniac.entity.object.position = vec2d_Sum(
+		maniac.entity.object.position, 
+		delta
+	);
 }
 
-
-
-void DrawCuboid(double xr, double yr, double zr, double x0, double y0, double z0, double width_x, 
-	double width_y, double width_z, std::vector<double> fillcolor, std::vector<double> outcolor, bool legs_or_hands = false, bool forward = false)
+void DrawCuboid(double xr, double yr, double zr, 
+	double x0, double y0, double z0, 
+	double width_x, double width_y, double width_z, 
+	std::vector<double> fillcolor, 
+	std::vector<double> outcolor, 
+	bool legs_or_hands = false, bool forward = false)
 {
 	double x1 = x0-width_x / 2;
 	double y1 = y0-width_y / 2;
@@ -382,7 +300,7 @@ void DrawCuboid(double xr, double yr, double zr, double x0, double y0, double z0
 	double x2 = x0 + width_x / 2;
 	double y2 = y0+width_y / 2;
 	double z2 = z0+width_z / 2;
-	std::vector points(8, std::vector<double>(3));
+	matrix2d<8, 3> points(std::array<double, 3>(), 8);
 
 	points[0] = { x1, y1, z1 };
 	points[1] = { x1, y2, z1 };
@@ -396,9 +314,11 @@ void DrawCuboid(double xr, double yr, double zr, double x0, double y0, double z0
 	if (legs_or_hands)
 	{
 		double angle;
-		if (forward) angle = maniac.rha;
-		else angle = -maniac.rha;
-		trunk[0] = RotatePolygon(std::vector<std::vector<double>> { points[0], points[1], points[2], points[3] }, 4, angle, false);
+		if (forward) angle = maniac.rightHandAngle;
+		else angle = -maniac.rightHandAngle;
+		trunk[0] = RotatePolygon(
+			matrix3d<4, 4, 3> { points[0], points[1], points[2], points[3] }, 
+			4, angle, false);
 		trunk[1] = RotatePolygon(std::vector<std::vector<double>> { points[4], points[5], points[6], points[7] }, 4, angle, false);
 		trunk[2] = RotatePolygon(std::vector<std::vector<double>> { points[5], points[1], points[2], points[6] }, 4, angle, false);
 		trunk[3] = RotatePolygon(std::vector<std::vector<double>> { points[4], points[0], points[3], points[7] }, 4, angle, false);
@@ -455,22 +375,22 @@ void DrawManiac(Maniac maniac)
 	double Sy = player_y - maniac.position.y;
 	
 	//Trunk
-	DrawCuboid(Sy * wallwidth, -wallheight / 12, Sx * wallwidth, 0, 0, 0, wallwidth / 2, wallheight / 3, wallwidth / 2, std::vector <double>{0.9, 0.7, 0.7}, std::vector <double>{1, 0.5, 0.5});
+	DrawCuboid(Sy * wall_width, -wall_height / 12, Sx * wall_width, 0, 0, 0, wall_width / 2, wall_height / 3, wall_width / 2, std::vector <double>{0.9, 0.7, 0.7}, std::vector <double>{1, 0.5, 0.5});
 
 	//Head
-	DrawCuboid(Sy * wallwidth, wallheight / 7, Sx * wallwidth, 0, 0, 0, wallheight / 12, wallheight / 12, wallheight / 12, std::vector <double>{ 0.9, 0.7, 0.7 }, std::vector <double>{ 1, 0.5, 0.5 });
+	DrawCuboid(Sy * wall_width, wall_height / 7, Sx * wall_width, 0, 0, 0, wall_height / 12, wall_height / 12, wall_height / 12, std::vector <double>{ 0.9, 0.7, 0.7 }, std::vector <double>{ 1, 0.5, 0.5 });
 
 	//Eyes
-	DrawCuboid(Sy * wallwidth, wallheight / 7, Sx * wallwidth, -wallheight / 48, wallheight / 48, -wallheight / 24, wallheight / 48, wallheight / 48, wallheight / 96, std::vector <double>{ 0, 0, 0 }, std::vector <double>{ 1, 0, 0 });
-	DrawCuboid(Sy * wallwidth, wallheight / 7, Sx * wallwidth, wallheight / 48, wallheight / 48, -wallheight / 24, wallheight / 48, wallheight / 48, wallheight / 96, std::vector <double>{ 0, 0, 0 }, std::vector <double>{ 1, 0, 0 });
+	DrawCuboid(Sy * wall_width, wall_height / 7, Sx * wall_width, -wall_height / 48, wall_height / 48, -wall_height / 24, wall_height / 48, wall_height / 48, wall_height / 96, std::vector <double>{ 0, 0, 0 }, std::vector <double>{ 1, 0, 0 });
+	DrawCuboid(Sy * wall_width, wall_height / 7, Sx * wall_width, wall_height / 48, wall_height / 48, -wall_height / 24, wall_height / 48, wall_height / 48, wall_height / 96, std::vector <double>{ 0, 0, 0 }, std::vector <double>{ 1, 0, 0 });
 
 	//Legs
-	DrawCuboid(Sy * wallwidth + wallwidth / 20, -wallheight / 12 - wallheight / 6, Sx * wallwidth, wallwidth / 8, -wallheight / 12, 0, wallwidth / 4, wallheight / 6, wallwidth / 4, std::vector <double>{ 0.9, 0.7, 0.7 }, std::vector <double>{ 1, 0.5, 0.5 }, true, true);
-	DrawCuboid(Sy * wallwidth - wallwidth / 20, -wallheight / 12 - wallheight / 6, Sx * wallwidth, -wallwidth / 8, -wallheight / 12, 0, wallwidth / 4, wallheight / 6, wallwidth / 4, std::vector <double>{ 0.9, 0.7, 0.7 }, std::vector <double>{ 1, 0.5, 0.5 }, true, false);
+	DrawCuboid(Sy * wall_width + wall_width / 20, -wall_height / 12 - wall_height / 6, Sx * wall_width, wall_width / 8, -wall_height / 12, 0, wall_width / 4, wall_height / 6, wall_width / 4, std::vector <double>{ 0.9, 0.7, 0.7 }, std::vector <double>{ 1, 0.5, 0.5 }, true, true);
+	DrawCuboid(Sy * wall_width - wall_width / 20, -wall_height / 12 - wall_height / 6, Sx * wall_width, -wall_width / 8, -wall_height / 12, 0, wall_width / 4, wall_height / 6, wall_width / 4, std::vector <double>{ 0.9, 0.7, 0.7 }, std::vector <double>{ 1, 0.5, 0.5 }, true, false);
 
 	//Hands
-	DrawCuboid(Sy * wallwidth + wallwidth / 4, wallheight / 12, Sx * wallwidth, wallwidth / 8, -wallheight / 6, 0, wallwidth / 8, wallheight / 4, wallwidth / 8, std::vector <double>{ 0.9, 0.7, 0.7 }, std::vector <double>{ 1, 0.5, 0.5 }, true, false);
-	DrawCuboid(Sy * wallwidth - wallwidth / 4, wallheight / 12, Sx * wallwidth, -wallwidth / 8, -wallheight / 6, 0, wallwidth / 8, wallheight / 4, wallwidth / 8, std::vector <double>{ 0.9, 0.7, 0.7 }, std::vector <double>{ 1, 0.5, 0.5 }, true, true);
+	DrawCuboid(Sy * wall_width + wall_width / 4, wall_height / 12, Sx * wall_width, wall_width / 8, -wall_height / 6, 0, wall_width / 8, wall_height / 4, wall_width / 8, std::vector <double>{ 0.9, 0.7, 0.7 }, std::vector <double>{ 1, 0.5, 0.5 }, true, false);
+	DrawCuboid(Sy * wall_width - wall_width / 4, wall_height / 12, Sx * wall_width, -wall_width / 8, -wall_height / 6, 0, wall_width / 8, wall_height / 4, wall_width / 8, std::vector <double>{ 0.9, 0.7, 0.7 }, std::vector <double>{ 1, 0.5, 0.5 }, true, true);
 }
 
 
@@ -552,7 +472,7 @@ void render()
 	DrawManiac(maniac);
 	double S = ManiacDist(maniac);
 	
-	MoveManiac(maniac);
+	Maniac_Move(maniac);
 
 	for (int x = 0; x < map_width; x++)
 	{
@@ -571,7 +491,7 @@ void render()
 				shade = d0 / (d0 + S) + d0 / (d0 + S2);
 				DrawCube(x, y, false, false, shade);
 			}
-			double c = wallheight / 2;
+			double c = wall_height / 2;
 			double S = sqrt(a * a + b * b + c * c);
 			double S2 = sqrt(a2 * a2 + b2 * b2 + c * c);
 			shade = d0 / (d0 + S) + d0 / (d0 + S2);
@@ -587,16 +507,16 @@ void render()
 void update_cube(double x, double y, bool roof, bool floor)
 {
 	double x1 = x;
-	double y1 = -wallheight / 2;
-	if (roof) y1 += wallheight;
-	else if (floor) y1 -= wallwidth;
+	double y1 = -wall_height / 2;
+	if (roof) y1 += wall_height;
+	else if (floor) y1 -= wall_width;
 	double z1 = y;
 
-	double x2 = x1 + wallwidth;
-	double y2 = wallheight / 2;
-	if (roof) y2 = y1 + wallwidth;
-	else if (floor) y2 = -wallheight / 2;
-	double z2 = z1 + wallwidth;
+	double x2 = x1 + wall_width;
+	double y2 = wall_height / 2;
+	if (roof) y2 = y1 + wall_width;
+	else if (floor) y2 = -wall_height / 2;
+	double z2 = z1 + wall_width;
 	std::vector <std::vector <double>> points(8);
 	points[0] = { x1, y1, z1 };
 	points[1] = { x1, y2, z1 };
@@ -622,8 +542,8 @@ void DrawCube(int x, int y, bool roof, bool floor, double shade)
 
 	double Sx = x - player_x;
 	double Sy = player_y - y;
-	double real_x = wallwidth * Sx;
-	double real_y = wallwidth * Sy;
+	double real_x = wall_width * Sx;
+	double real_y = wall_width * Sy;
 	update_cube(real_y, real_x, roof, floor);
 
 	glBegin(GL_LINE_STRIP);
@@ -678,12 +598,12 @@ bool wall_collision(double player_x, double player_y)
 			char cell = field[y][x];
 			if (cell == Maze::WALL)
 			{
-				double Sx = (x - player_x) * wallwidth;
-				double Sy = (y - player_y) * wallwidth;
-				if (Sx > -wallwidth + collision_border
-					&& Sx < wallwidth - collision_border
-					&& Sy > -wallwidth + collision_border
-					&& Sy < wallwidth - collision_border)
+				double Sx = (x - player_x) * wall_width;
+				double Sy = (y - player_y) * wall_width;
+				if (Sx > -wall_width + collision_border
+					&& Sx < wall_width - collision_border
+					&& Sy > -wall_width + collision_border
+					&& Sy < wall_width - collision_border)
 					return true;
 			}
 		}
@@ -712,11 +632,11 @@ void HandlePlayerControl(SDL_Event event) {
 void Move(const Direction direction)
 {
 	double alpha = degrees_to_radians(rotation_angle);
-	double dx = cos(alpha) * dS;
-	double dy = sin(alpha) * dS;
+	double dx = cos(alpha) * speedDelta;
+	double dy = sin(alpha) * speedDelta;
 
-	if (direction == Direction::LEFT) rotation_angle -= dA;
-	else if (direction == Direction::RIGHT) rotation_angle += dA;
+	if (direction == Direction::LEFT) rotation_angle -= angleDelta;
+	else if (direction == Direction::RIGHT) rotation_angle += angleDelta;
 	if (direction == Direction::FORWARD) {
 		player_y -= dy;
 		player_x -= dx;
@@ -828,8 +748,8 @@ int SDL_main(int argc, char ** argv) {
 
 	player_y = player_position.first-0.5;
 	player_x = player_position.second+0.5;
-	wallheight = maze.width();
-	wallwidth = maze.height();
+	wall_height = maze.width();
+	wall_width = maze.height();
 
 	int screen_width = 1280;
 	int screen_height = 960;

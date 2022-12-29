@@ -164,6 +164,7 @@
   <ItemGroup>
     <ClInclude Include="Direction.h" />
     <ClInclude Include="Maze.h" />
+    <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="MazeHorror.rc" />
