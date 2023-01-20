@@ -3,7 +3,6 @@
 Maze::Maze(size_t width, size_t height) {
     if (width % 2 == 0 || height % 2 == 0)
         throw std::invalid_argument("width and height must be odd sizes");
-
     width_ = width;
     height_ = height;
 

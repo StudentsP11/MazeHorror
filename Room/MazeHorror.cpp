@@ -77,8 +77,8 @@ int count = 0;
 
 char** field = nullptr;
 
-const int check_points_number = 6;
-const double check_points[check_points_number][2] = { 
+constexpr int check_points_number = 6;
+constexpr double check_points[check_points_number][2] = { 
 	{20, 1}, {20, 17}, {1, 7}, 
 	{1, 10}, {1, 1}, {1, 20} 
 };
@@ -91,11 +91,11 @@ Maniac maniac {
 			.position {1, 4}, 
 			.size {1,1}
 		}, 
-		.viewDirectionAngle { 0 }
+		.viewDirectionAngle = 0
 	}, 
-	.rightHandAngle { 0 },
-	.point_x { 0 },
-	.point_y { 0 }
+	.rightHandAngle = 0,
+	.point_x = 0,
+	.point_y = 0
 };
 
 Player player {
@@ -104,15 +104,14 @@ Player player {
 			.position {1, 1},
 			.size {1,1}
 		},
-		.viewDirectionAngle { 0 }
+		.viewDirectionAngle = 0
 	},
-	.is_died { false }
+	.is_died = false
 };
 
 Mix_Chunk* soundScary;
 Mix_Chunk* soundKrik;
 Mix_Chunk* soundBenzopila;
-
 
 void Move(const Direction direction);
 
