@@ -5,6 +5,8 @@
 #include <map>
 #include <vector>
 #include <array>
+#include <random>
+#include <numbers>
 
 // GRAPHICS (DO NOT TOUCH)
 #include <GL/glew.h>
@@ -24,16 +26,14 @@
 #define DEV
 
 template<std::size_t X, std::size_t Y, std::size_t Z>
-using matrix3d = std::array<std::array<std::array<double, Z>, Y>, X>;
+using matrix3d = std::array<std::array<std::array<float, Z>, Y>, X>;
 
 template<std::size_t X, std::size_t Y>
-using matrix2d = std::array<std::array<double, Y>, X>;
-
-bool wall_collision(double player_x, double player_y);
+using matrix2d = std::array<std::array<float, Y>, X>;
 
 struct vec2d {
-	double x;
-	double y;
+	float x;
+	float y;
 };
 
 struct GameObject {
@@ -43,12 +43,12 @@ struct GameObject {
 
 struct Entity {
 	GameObject object;
-	double viewDirectionAngle;
+	float viewDirectionAngle;
 };
 
 struct Maniac {
 	Entity entity;
-	double rightHandAngle, point_x, point_y;
+	float rightHandAngle, point_x, point_y;
 };
 
 struct Player {
@@ -56,34 +56,36 @@ struct Player {
 	bool is_died = false;
 };
 
-double ManiacDist(const Maniac& maniac);
+bool is_wall_collided(const vec2d& player_position);
 
 const char* SOUND_BENZOPILA = "Sounds/benzopila.wav";
 const char* SOUND_KRIK = "Sounds/krik.wav";
 const char* SOUND_SCARY = "Sounds/scary_sound.wav";
 
-const size_t map_width = 31;
-const size_t map_height = 31;
-const double wall_width = 0.5;
-const double wall_height = 3;
-const double pi = acos(0) * 2;
-const double angleDelta = 5;
-const double speedDelta = 0.05;
-const double d0 = 0.25;
+constexpr float pi = static_cast<float>(std::numbers::pi);
+
+constexpr size_t map_width = 31;
+constexpr size_t map_height = 31;
+constexpr float angleDelta = 5;
+constexpr float speedDelta = 0.05f;
+constexpr float d0 = 0.25;
 
 int k = 1;
 
 int count = 0;
 
+float wall_width = 0.5;
+float wall_height = 3;
+
 char** field = nullptr;
 
 constexpr int check_points_number = 6;
-constexpr double check_points[check_points_number][2] = { 
-	{20, 1}, {20, 17}, {1, 7}, 
+constexpr float check_points[check_points_number][2] = { 
+	{20, 1}, {20, 17}, {1, 7},
 	{1, 10}, {1, 1}, {1, 20} 
 };
 
- matrix3d<6,4,3> current_cube;
+matrix3d<6,4,3> current_cube;
 
 Maniac maniac { 
 	.entity {
@@ -113,31 +115,31 @@ Mix_Chunk* soundScary;
 Mix_Chunk* soundKrik;
 Mix_Chunk* soundBenzopila;
 
-void Move(const Direction direction);
+void Move(Entity& player, const Direction direction);
 
-std::vector <std::vector<double>> RotatePolygon(
+matrix2d<4, 3> RotatePolygon(
 	const matrix2d<4, 3> & polygon,
-	const double verts_amount,
-	const double angle,
+	const float angle,
 	const bool axis_y = true)
 {
-	std::vector new_polygon(verts_amount, std::vector<double>(3));
-	for (int i = 0; i < verts_amount; i++)
+	constexpr size_t verts_amount = 4;
+	matrix2d<verts_amount, 3> new_polygon{};
+	for (size_t i = 0; i < verts_amount; i++)
 	{
-		double x = polygon[i][0];
-		double y = polygon[i][1];
-		double z = polygon[i][2];
+		const float x = polygon[i][0];
+		const float y = polygon[i][1];
+		const float z = polygon[i][2];
 		if (axis_y)
 		{
-			double new_x = x * cos(angle) + z * sin(angle);
-			double new_z = -x * sin(angle) + z * cos(angle);
+			const float new_x = x * cos(angle) + z * sin(angle);
+			const float new_z = -x * sin(angle) + z * cos(angle);
 			new_polygon[i][0] = new_x;
 			new_polygon[i][1] = y;
 			new_polygon[i][2] = new_z;
 		}
 		else {
-			double new_y = y * cos(angle) + z * sin(angle);
-			double new_z = -y * sin(angle) + z * cos(angle);
+			const float new_y = y * cos(angle) + z * sin(angle);
+			const float new_z = -y * sin(angle) + z * cos(angle);
 			new_polygon[i][0] = x;
 			new_polygon[i][1] = new_y;
 			new_polygon[i][2] = new_z;
@@ -151,32 +153,34 @@ std::vector <std::vector<double>> RotatePolygon(
 	const GameObject& game_object1, 
 	const GameObject& game_object2) 
 {
-	const double tg =
+	const float tg =
 		(game_object1.position.y - game_object2.position.y)
 		/ (game_object1.position.x - game_object2.position.y);
+
 	const vec2d min_position = {
 		std::min(game_object2.position.x, game_object1.position.x),
 		std::min(game_object2.position.y, game_object1.position.y)
 	};
+	
 	const vec2d	max_position = {
 		std::max(game_object2.position.x, game_object1.position.x),
 		0
 	};
 
-	for (double x = min_position.x; x < max_position.x; x += 0.5)
+	for (float x = min_position.x; x < max_position.x; x += 0.5)
 	{
-		double y = game_object2.position.y + tg * (x - min_position.x);
-		if (wall_collision(x, y))
+		float y = game_object2.position.y + tg * (x - min_position.x);
+		if (is_wall_collided({x, y}))
 			return false;
 	}
 
 	return true;
 }
 
-[[nodiscard]] inline double vec2d_Dist(const vec2d& vec1, const vec2d& vec2)
+[[nodiscard]] inline float vec2d_Dist(const vec2d& vec1, const vec2d& vec2)
 {
-	const double x = vec1.x - vec2.x;
-	const double y = vec1.y - vec2.y;
+	const float x = vec1.x - vec2.x;
+	const float y = vec1.y - vec2.y;
 	return SDL_sqrt(x * x + y * y);
 }
 
@@ -186,8 +190,8 @@ vec2d check_cells(const Maniac& maniac) {
 		maniac.entity.object.position.y 
 	};
 
-	double dx = 0, dy = 0;
-	double minDist = SDL_sqrt(static_cast<double>(
+	float dx = 0, dy = 0;
+	float minDist = SDL_sqrt(static_cast<double>(
 		map_height * map_height + map_width * map_width
 	));
 	for (int i = 0; i < 3; i++) {
@@ -196,7 +200,7 @@ vec2d check_cells(const Maniac& maniac) {
 			const size_t y = static_cast<size_t>(position.y) + i - 1;
 			const size_t x = static_cast<size_t>(position.x) + j - 1;
 
-			// Handler that doesnt accept error indexes
+			// Handler that doesn't accept error indexes
 			if (y >= map_height
 				|| x >= map_width) {
 				continue;
@@ -206,22 +210,22 @@ vec2d check_cells(const Maniac& maniac) {
 				continue;
 			}
 			
-			const double distance = vec2d_Dist(
+			const float distance = vec2d_Dist(
 				{ maniac.point_x, maniac.point_y },
-				{ static_cast<double>(x), static_cast<double>(y) }
+				{ static_cast<float>(x), static_cast<float>(y) }
 			);
 			if (minDist > distance) {
 				minDist = distance;
 
-				const double sine = (y - position.y) 
+				const float sine = (static_cast<float>(y) - position.y) 
 					/ vec2d_Dist(
 						{ position.x, position.y },
-						{ static_cast<double>(x), static_cast<double>(y) }
+						{ static_cast<float>(x), static_cast<float>(y) }
 					);
-				const double cosine = (x - position.x)
+				const float cosine = (x - position.x)
 					/ vec2d_Dist(
 						{ position.x, position.y },
-						{ static_cast<double>(x), static_cast<double>(y) }
+						{ static_cast<float>(x), static_cast<float>(y) }
 					);
 				dx = speedDelta * cosine / 5;
 				dy = speedDelta * sine / 5;
@@ -241,7 +245,8 @@ vec2d vec2d_Sum(const vec2d & vec1, const vec2d & vec2) {
 
 void Maniac_Move(Maniac& maniac, const vec2d& player_position)
 {
-	maniac.rightHandAngle += k * pi / 60;
+	maniac.rightHandAngle += static_cast<float>(k)
+		* pi / 60;
 	if (maniac.rightHandAngle > pi / 4)
 	{
 		maniac.rightHandAngle = pi / 4;
@@ -256,12 +261,12 @@ void Maniac_Move(Maniac& maniac, const vec2d& player_position)
 	if (GameObject_Sees(maniac.entity.object, 
 		player.entity.object)) 
 	{
-		double sine, cosine;
-		sine = (player_position.y - maniac.entity.object.position.y) 
-			/ ManiacDist(maniac);
-		cosine = (player_position.x - maniac.entity.object.position.x) 
-			/ ManiacDist(maniac);
-		double angle = asin(sine);
+		const float sine = (player_position.y 
+			- maniac.entity.object.position.y
+			)/ vec2d_Dist(maniac.entity.object.position, maniac.entity.object.position);
+		const float cosine = (player_position.x - maniac.entity.object.position.x)
+			/ vec2d_Dist(maniac.entity.object.position, maniac.entity.object.position);
+		float angle = asin(sine);
 		if (cosine > 0 && cos(angle) < 0 || cosine < 0 && cos(angle) > 0)
 			angle = pi - angle;
 		maniac.entity.viewDirectionAngle = pi - angle;
@@ -269,16 +274,18 @@ void Maniac_Move(Maniac& maniac, const vec2d& player_position)
 		maniac.point_y = player_position.y;
 	}
 	else {
-		double x = maniac.entity.object.position.x - maniac.point_x;
-		double y = maniac.entity.object.position.y - maniac.point_y;
-		if ((x * x + y * y) <= 0.01) {
-			int index = rand() % check_points_number;
+		const float x = maniac.entity.object.position.x - maniac.point_x;
+		const float y = maniac.entity.object.position.y - maniac.point_y;
+		if ((x * x + y * y) <= 0.01f) {
+			auto rng = std::random_device();
+			std::uniform_int_distribution distribute(0, check_points_number);
+			const int index = distribute(rng);
 			maniac.point_x = check_points[index][0];
 			maniac.point_y = check_points[index][1];
 		}
 	}
 
-	vec2d delta = check_cells(maniac);
+	const vec2d delta = check_cells(maniac);
 
 	maniac.entity.object.position = vec2d_Sum(
 		maniac.entity.object.position, 
@@ -286,20 +293,20 @@ void Maniac_Move(Maniac& maniac, const vec2d& player_position)
 	);
 }
 
-void DrawCuboid(double xr, double yr, double zr, 
-	double x0, double y0, double z0, 
-	double width_x, double width_y, double width_z, 
-	std::vector<double> fillcolor, 
-	std::vector<double> outcolor, 
-	bool legs_or_hands = false, bool forward = false)
+void draw_cuboid(const Maniac& maniac, float xr, float yr, float zr, 
+	float x0, float y0, float z0, 
+	float width_x, float width_y, float width_z, 
+	std::vector<float> fillcolor, 
+	std::vector<float> outcolor, 
+	bool is_maniac_hands = false, bool forward = false)
 {
-	double x1 = x0-width_x / 2;
-	double y1 = y0-width_y / 2;
-	double z1 = z0-width_z / 2;
-	double x2 = x0 + width_x / 2;
-	double y2 = y0+width_y / 2;
-	double z2 = z0+width_z / 2;
-	matrix2d<8, 3> points(std::array<double, 3>(), 8);
+	float x1 = x0-width_x / 2;
+	float y1 = y0-width_y / 2;
+	float z1 = z0-width_z / 2;
+	float x2 = x0 + width_x / 2;
+	float y2 = y0+width_y / 2;
+	float z2 = z0+width_z / 2;
+	matrix2d<8, 3> points{};
 
 	points[0] = { x1, y1, z1 };
 	points[1] = { x1, y2, z1 };
@@ -309,34 +316,38 @@ void DrawCuboid(double xr, double yr, double zr,
 	points[5] = { x1, y2, z2 };
 	points[6] = { x2, y2, z2 };
 	points[7] = { x2, y1, z2 };
-	std::vector<std::vector<std::vector<double>>> trunk(6);
-	if (legs_or_hands)
+
+	matrix3d<6, 4, 3> trunk{};
+
+	// TODO: Fix big condition
+	if (is_maniac_hands)
 	{
-		double angle;
+		float angle;
 		if (forward) angle = maniac.rightHandAngle;
 		else angle = -maniac.rightHandAngle;
 		trunk[0] = RotatePolygon(
-			matrix3d<4, 4, 3> { points[0], points[1], points[2], points[3] }, 
-			4, angle, false);
-		trunk[1] = RotatePolygon(std::vector<std::vector<double>> { points[4], points[5], points[6], points[7] }, 4, angle, false);
-		trunk[2] = RotatePolygon(std::vector<std::vector<double>> { points[5], points[1], points[2], points[6] }, 4, angle, false);
-		trunk[3] = RotatePolygon(std::vector<std::vector<double>> { points[4], points[0], points[3], points[7] }, 4, angle, false);
-		trunk[4] = RotatePolygon(std::vector<std::vector<double>> { points[5], points[1], points[0], points[4] }, 4, angle, false);
-		trunk[5] = RotatePolygon(std::vector<std::vector<double>> { points[6], points[2], points[3], points[7] }, 4, angle, false);
+			matrix2d<4, 3>{ points[0], points[1], points[2], points[3] }, 
+			angle, false
+		);
+		trunk[1] = RotatePolygon({ points[4], points[5], points[6], points[7] }, angle, false);
+		trunk[2] = RotatePolygon({ points[5], points[1], points[2], points[6] }, angle, false);
+		trunk[3] = RotatePolygon({ points[4], points[0], points[3], points[7] }, angle, false);
+		trunk[4] = RotatePolygon({ points[5], points[1], points[0], points[4] }, angle, false);
+		trunk[5] = RotatePolygon({ points[6], points[2], points[3], points[7] }, angle, false);
 
 		for (int i = 0; i < 6; i++)
 		{
-			trunk[i] = RotatePolygon(trunk[i], 4, maniac.rot_angle);
+			trunk[i] = RotatePolygon(trunk[i], maniac.entity.viewDirectionAngle);
 		}
 	}
 	else
 	{
-		trunk[0] = RotatePolygon({ points[0], points[1], points[2], points[3] }, 4, maniac.rot_angle);
-		trunk[1] = RotatePolygon({ points[4], points[5], points[6], points[7] }, 4, maniac.rot_angle);
-		trunk[2] = RotatePolygon({ points[5], points[1], points[2], points[6] }, 4, maniac.rot_angle);	
-		trunk[3] = RotatePolygon({ points[4], points[0], points[3], points[7] }, 4, maniac.rot_angle);
-		trunk[4] = RotatePolygon({ points[5], points[1], points[0], points[4] }, 4, maniac.rot_angle);
-		trunk[5] = RotatePolygon({ points[6], points[2], points[3], points[7] }, 4, maniac.rot_angle);
+		trunk[0] = RotatePolygon({ points[0], points[1], points[2], points[3] }, maniac.entity.viewDirectionAngle);
+		trunk[1] = RotatePolygon({ points[4], points[5], points[6], points[7] }, maniac.entity.viewDirectionAngle);
+		trunk[2] = RotatePolygon({ points[5], points[1], points[2], points[6] }, maniac.entity.viewDirectionAngle);
+		trunk[3] = RotatePolygon({ points[4], points[0], points[3], points[7] }, maniac.entity.viewDirectionAngle);
+		trunk[4] = RotatePolygon({ points[5], points[1], points[0], points[4] }, maniac.entity.viewDirectionAngle);
+		trunk[5] = RotatePolygon({ points[6], points[2], points[3], points[7] }, maniac.entity.viewDirectionAngle);
 	}
 
 	glBegin(GL_LINE_LOOP);
@@ -368,33 +379,33 @@ void DrawCuboid(double xr, double yr, double zr,
 	glEnd();
 }
 
-void DrawManiac(Maniac maniac)
+void DrawManiac(const Maniac& maniac, const Player& player)
 {
-	double Sx = maniac.position.x - player_x;
-	double Sy = player_y - maniac.position.y;
+	const float Sx = maniac.entity.object.position.x - player.entity.object.position.x;
+	const float Sy = player.entity.object.position.y - maniac.entity.object.position.y;
 	
 	//Trunk
-	DrawCuboid(Sy * wall_width, -wall_height / 12, Sx * wall_width, 0, 0, 0, wall_width / 2, wall_height / 3, wall_width / 2, std::vector <double>{0.9, 0.7, 0.7}, std::vector <double>{1, 0.5, 0.5});
+	draw_cuboid(maniac, Sy * wall_width, -wall_height / 12, Sx * wall_width, 0, 0, 0, wall_width / 2, wall_height / 3, wall_width / 2, std::vector <float>{0.9, 0.7, 0.7}, std::vector <float>{1, 0.5, 0.5});
 
 	//Head
-	DrawCuboid(Sy * wall_width, wall_height / 7, Sx * wall_width, 0, 0, 0, wall_height / 12, wall_height / 12, wall_height / 12, std::vector <double>{ 0.9, 0.7, 0.7 }, std::vector <double>{ 1, 0.5, 0.5 });
+	draw_cuboid(maniac, Sy * wall_width, wall_height / 7, Sx * wall_width, 0, 0, 0, wall_height / 12, wall_height / 12, wall_height / 12, std::vector <float>{ 0.9, 0.7, 0.7 }, std::vector <float>{ 1, 0.5, 0.5 });
 
 	//Eyes
-	DrawCuboid(Sy * wall_width, wall_height / 7, Sx * wall_width, -wall_height / 48, wall_height / 48, -wall_height / 24, wall_height / 48, wall_height / 48, wall_height / 96, std::vector <double>{ 0, 0, 0 }, std::vector <double>{ 1, 0, 0 });
-	DrawCuboid(Sy * wall_width, wall_height / 7, Sx * wall_width, wall_height / 48, wall_height / 48, -wall_height / 24, wall_height / 48, wall_height / 48, wall_height / 96, std::vector <double>{ 0, 0, 0 }, std::vector <double>{ 1, 0, 0 });
+	draw_cuboid(maniac, Sy * wall_width, wall_height / 7, Sx * wall_width, -wall_height / 48, wall_height / 48, -wall_height / 24, wall_height / 48, wall_height / 48, wall_height / 96, std::vector <float>{ 0, 0, 0 }, std::vector <float>{ 1, 0, 0 });
+	draw_cuboid(maniac, Sy * wall_width, wall_height / 7, Sx * wall_width, wall_height / 48, wall_height / 48, -wall_height / 24, wall_height / 48, wall_height / 48, wall_height / 96, std::vector <float>{ 0, 0, 0 }, std::vector <float>{ 1, 0, 0 });
 
 	//Legs
-	DrawCuboid(Sy * wall_width + wall_width / 20, -wall_height / 12 - wall_height / 6, Sx * wall_width, wall_width / 8, -wall_height / 12, 0, wall_width / 4, wall_height / 6, wall_width / 4, std::vector <double>{ 0.9, 0.7, 0.7 }, std::vector <double>{ 1, 0.5, 0.5 }, true, true);
-	DrawCuboid(Sy * wall_width - wall_width / 20, -wall_height / 12 - wall_height / 6, Sx * wall_width, -wall_width / 8, -wall_height / 12, 0, wall_width / 4, wall_height / 6, wall_width / 4, std::vector <double>{ 0.9, 0.7, 0.7 }, std::vector <double>{ 1, 0.5, 0.5 }, true, false);
+	draw_cuboid(maniac, Sy * wall_width + wall_width / 20, -wall_height / 12 - wall_height / 6, Sx * wall_width, wall_width / 8, -wall_height / 12, 0, wall_width / 4, wall_height / 6, wall_width / 4, std::vector <float>{ 0.9, 0.7, 0.7 }, std::vector <float>{ 1, 0.5, 0.5 }, true, true);
+	draw_cuboid(maniac, Sy * wall_width - wall_width / 20, -wall_height / 12 - wall_height / 6, Sx * wall_width, -wall_width / 8, -wall_height / 12, 0, wall_width / 4, wall_height / 6, wall_width / 4, std::vector <float>{ 0.9, 0.7, 0.7 }, std::vector <float>{ 1, 0.5, 0.5 }, true, false);
 
 	//Hands
-	DrawCuboid(Sy * wall_width + wall_width / 4, wall_height / 12, Sx * wall_width, wall_width / 8, -wall_height / 6, 0, wall_width / 8, wall_height / 4, wall_width / 8, std::vector <double>{ 0.9, 0.7, 0.7 }, std::vector <double>{ 1, 0.5, 0.5 }, true, false);
-	DrawCuboid(Sy * wall_width - wall_width / 4, wall_height / 12, Sx * wall_width, -wall_width / 8, -wall_height / 6, 0, wall_width / 8, wall_height / 4, wall_width / 8, std::vector <double>{ 0.9, 0.7, 0.7 }, std::vector <double>{ 1, 0.5, 0.5 }, true, true);
+	draw_cuboid(maniac, Sy * wall_width + wall_width / 4, wall_height / 12, Sx * wall_width, wall_width / 8, -wall_height / 6, 0, wall_width / 8, wall_height / 4, wall_width / 8, std::vector <float>{ 0.9, 0.7, 0.7 }, std::vector <float>{ 1, 0.5, 0.5 }, true, false);
+	draw_cuboid(maniac, Sy * wall_width - wall_width / 4, wall_height / 12, Sx * wall_width, -wall_width / 8, -wall_height / 6, 0, wall_width / 8, wall_height / 4, wall_width / 8, std::vector <float>{ 0.9, 0.7, 0.7 }, std::vector <float>{ 1, 0.5, 0.5 }, true, true);
 }
 
 
 
-void DrawCube(int x, int y, bool roof, bool floor, double shade);
+void DrawCube(int x, int y, bool roof, bool floor, float shade);
 
 void reshape(int w, int h)
 {
@@ -441,8 +452,8 @@ void OnDied() {
 
 	for (int i = 0; i < 200; i++)
 	{
-		double x = (rand() % 1000) / 2000.0 - 0.25;
-		double y = (rand() % 1000) / 2000.0 - 0.25;
+		float x = (rand() % 1000) / 2000.0 - 0.25;
+		float y = (rand() % 1000) / 2000.0 - 0.25;
 
 		glVertex3f(x, y, -0.1);
 		glVertex3f(x + 0.002, y, -0.1);
@@ -453,9 +464,9 @@ void OnDied() {
 	glEnd();
 }
 
-void render()
+void render(Player& player)
 {
-	if (died)
+	if (player.is_died)
 	{
 		OnDied();
 		return;
@@ -466,57 +477,57 @@ void render()
 	glDepthFunc(GL_GREATER);
 	glLoadIdentity();
 
-	glRotatef(rotation_angle, 0, 1, 0);
+	glRotatef(player.entity.viewDirectionAngle, 0, 1, 0);
 
-	DrawManiac(maniac);
-	double S = ManiacDist(maniac);
+	DrawManiac(maniac, player);
+	float S = vec2d_Dist(maniac.entity.object.position, maniac.entity.object.position);
 	
-	Maniac_Move(maniac);
+	Maniac_Move(maniac, player.entity.object.position);
 
-	for (int x = 0; x < map_width; x++)
+	for (size_t x = 0; x < map_width; x++)
 	{
-		for (int y = 0; y < map_height; y++)
+		for (size_t y = 0; y < map_height; y++)
 		{
 			char cell = field[y][x];
-			double shade;
-			double a = x - player_x;
-			double b = y - player_y;
-			double a2 = x - maniac.position.x;
-			double b2 = y - maniac.position.y;
+			float shade;
+			float a = x - player.entity.object.position.x;
+			float b = y - player.entity.object.position.y;
+			float a2 = x - maniac.entity.object.position.x;
+			float b2 = y - maniac.entity.object.position.y;
 			if (cell == '#')
 			{
-				double S = sqrt(a * a + b * b);
-				double S2 = sqrt(a2 * a2 + b2 * b2);
+				float S = sqrt(a * a + b * b);
+				float S2 = sqrt(a2 * a2 + b2 * b2);
 				shade = d0 / (d0 + S) + d0 / (d0 + S2);
 				DrawCube(x, y, false, false, shade);
 			}
-			double c = wall_height / 2;
-			double S = sqrt(a * a + b * b + c * c);
-			double S2 = sqrt(a2 * a2 + b2 * b2 + c * c);
+			float c = wall_height / 2;
+			float S = sqrt(a * a + b * b + c * c);
+			float S2 = sqrt(a2 * a2 + b2 * b2 + c * c);
 			shade = d0 / (d0 + S) + d0 / (d0 + S2);
 			DrawCube(x, y, true, false, shade);
 			DrawCube(x, y, false, true, shade);
 		}
 	}
-	if (ManiacDist(maniac) <= 1) {
-		died = true;
+	if (vec2d_Dist(maniac.entity.object.position, maniac.entity.object.position) <= 1) {
+		player.is_died = true;
 	}
 }
 
-void update_cube(double x, double y, bool roof, bool floor)
+void update_cube(float x, float y, bool roof, bool floor)
 {
-	double x1 = x;
-	double y1 = -wall_height / 2;
+	float x1 = x;
+	float y1 = -wall_height / 2;
 	if (roof) y1 += wall_height;
 	else if (floor) y1 -= wall_width;
-	double z1 = y;
+	float z1 = y;
 
-	double x2 = x1 + wall_width;
-	double y2 = wall_height / 2;
+	float x2 = x1 + wall_width;
+	float y2 = wall_height / 2;
 	if (roof) y2 = y1 + wall_width;
 	else if (floor) y2 = -wall_height / 2;
-	double z2 = z1 + wall_width;
-	std::vector <std::vector <double>> points(8);
+	float z2 = z1 + wall_width;
+	matrix2d<8, 3> points{};
 	points[0] = { x1, y1, z1 };
 	points[1] = { x1, y2, z1 };
 	points[2] = { x2, y2, z1 };
@@ -535,14 +546,14 @@ void update_cube(double x, double y, bool roof, bool floor)
 	current_cube[5] = { points[6], points[2], points[3], points[7] };
 }
 
-void DrawCube(int x, int y, bool roof, bool floor, double shade)
+void DrawCube(int x, int y, bool roof, bool floor, float shade)
 {
 	glDisable(GL_LIGHTING);
 
-	double Sx = x - player_x;
-	double Sy = player_y - y;
-	double real_x = wall_width * Sx;
-	double real_y = wall_width * Sy;
+	const float Sx = x - player.entity.object.position.x;
+	const float Sy = player.entity.object.position.y - y;
+	const float real_x = wall_width * Sx;
+	const float real_y = wall_width * Sy;
 	update_cube(real_y, real_x, roof, floor);
 
 	glBegin(GL_LINE_STRIP);
@@ -581,24 +592,27 @@ void DrawCube(int x, int y, bool roof, bool floor, double shade)
 	//}
 }
 
-double degrees_to_radians(double angle)
+float degrees_to_radians(float angle)
 {
 	return angle / 180 * pi;
 }
 
 // TODO: Rework
-bool wall_collision(double player_x, double player_y)
+bool is_wall_collided(const vec2d& player_position)
 {
-	const double collision_border = 0.5;
-	for (int x = 0; x < map_width; x++)
+	constexpr float collision_border = 0.5;
+
+	const float player_x = player_position.x, player_y = player_position.y;
+	
+	for (size_t x = 0; x < map_width; x++)
 	{
-		for (int y = 0; y < map_height; y++)
+		for (size_t y = 0; y < map_height; y++)
 		{
-			char cell = field[y][x];
+			const char cell = field[y][x];
 			if (cell == Maze::WALL)
 			{
-				double Sx = (x - player_x) * wall_width;
-				double Sy = (y - player_y) * wall_width;
+				float Sx = (x - player_x) * wall_width;
+				float Sy = (y - player_y) * wall_width;
 				if (Sx > -wall_width + collision_border
 					&& Sx < wall_width - collision_border
 					&& Sy > -wall_width + collision_border
@@ -611,11 +625,9 @@ bool wall_collision(double player_x, double player_y)
 	return false;
 }
 
-void HandlePlayerControl(SDL_Event event) {
+void HandlePlayerControl(SDL_Event event, Player& player) {
 	const auto is_keys_down = SDL_GetKeyboardState(nullptr);
-
-	std::vector<SDL_Scancode> check_keys;
-
+	
 	for (const auto& direction : DIRECTIONS) {
 		auto check_keys = AllKeysFor(direction);
 		if (std::any_of(
@@ -623,39 +635,45 @@ void HandlePlayerControl(SDL_Event event) {
 			check_keys.end(), 
 			[is_keys_down](SDL_Scancode key) { return is_keys_down[key]; })
 		) {
-			Move(direction);
+			Move(player.entity, direction);
 		}
 	}
 }
 
-void Move(const Direction direction)
+void Move(Entity& player, const Direction direction)
 {
-	double alpha = degrees_to_radians(rotation_angle);
-	double dx = cos(alpha) * speedDelta;
-	double dy = sin(alpha) * speedDelta;
-
-	if (direction == Direction::LEFT) rotation_angle -= angleDelta;
-	else if (direction == Direction::RIGHT) rotation_angle += angleDelta;
-	if (direction == Direction::FORWARD) {
-		player_y -= dy;
-		player_x -= dx;
-	}
-	else if (direction == Direction::BACKWARD) {
-		player_y += dy;
-		player_x += dx;
+	const float alpha = degrees_to_radians(player.viewDirectionAngle);
+	float dx = cos(alpha) * speedDelta;
+	float dy = sin(alpha) * speedDelta;
+	
+	switch(direction) {
+	case Direction::LEFT: 
+		player.viewDirectionAngle -= angleDelta;
+		break;
+	case Direction::RIGHT: 
+		player.viewDirectionAngle += angleDelta;
+		break;
+	case Direction::FORWARD:
+		player.object.position.y -= dy;
+		player.object.position.x -= dx;
+		break;
+	case Direction::BACKWARD:
+		player.object.position.y -= dy;
+		player.object.position.x -= dx;
+		break;
 	}
 
 	// TODO: Rework
-	if (false/*wall_collision(player_x, player_y)*/)
+	if (false/*is_wall_collided(player_x, player_y)*/)
 	{
 		if (direction == Direction::FORWARD)
 		{
-			player_y += dy;
-			player_x += dx;
+			player.object.position.y += dy;
+			player.object.position.x += dx;
 		}
 		else if (direction == Direction::BACKWARD) {
-			player_y -= dy;
-			player_x -= dx;
+			player.object.position.y -= dy;
+			player.object.position.x -= dx;
 		}
 	}
 }
@@ -743,10 +761,10 @@ int SDL_main(int argc, char ** argv) {
 		player_position = RandomPosition(maze);
 	} while (field[player_position.first][player_position.second] == Maze::WALL);
 
-	maze.Print();
+	maze.print();
 
-	player_y = player_position.first-0.5;
-	player_x = player_position.second+0.5;
+	player.entity.object.position.y = player_position.first-0.5;
+	player.entity.object.position.x = player_position.second+0.5;
 	wall_height = maze.width();
 	wall_width = maze.height();
 
@@ -763,19 +781,20 @@ int SDL_main(int argc, char ** argv) {
 		if (event.type == SDL_QUIT)
 			break;
 
-		HandlePlayerControl(event);
+		HandlePlayerControl(event, player);
 
 		SDL_GetWindowSize(window, &screen_width, &screen_height);
 		reshape(screen_width, screen_height);
 		
-		const double maniacDistance = std::abs(ManiacDist(maniac));
-		const uint8_t maniacSoundDistance = maniacDistance > 255 ? 255 : maniacDistance;
+		const float maniacDistance = std::abs(vec2d_Dist(maniac.entity.object.position, maniac.entity.object.position));
+		const uint8_t maniacSoundDistance = maniacDistance > 255.f ? 255 : static_cast<uint8_t>(maniacDistance);
 		
 		Mix_SetPosition(maniacMusicChannel,
-			std::atan2(maniac.position.y-player_y, maniac.position.x-player_x),
+			std::atan2(maniac.entity.object.position.y- player.entity.object.position.y,
+				maniac.entity.object.position.x - maniac.entity.object.position.x),
 			maniacSoundDistance);
 
-		render();
+		render(player);
 
 		SDL_GL_SwapWindow(window);
 	}

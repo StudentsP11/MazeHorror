@@ -43,7 +43,7 @@ Maze::~Maze() {
     return width_;
 }
 
-void Maze::Print() const
+void Maze::print() const
 {
     using std::cout;
 

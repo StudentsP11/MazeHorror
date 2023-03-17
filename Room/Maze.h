@@ -12,7 +12,7 @@ public:
         SPACE = ' ',
     };
 
-    void Print() const; //Печать лабиринта
+    void print() const;
 
     Maze(size_t width, size_t height);
 
@@ -29,7 +29,7 @@ private:
     size_t height_, width_;
     char** array_;
 
-    void Generate(); //Создание лабиринта
+    void Generate();
     void RemoveDeadEnd(int x, int y);
     void RemoveDeadEnds();
     bool DeadEnd(int x, int y);
