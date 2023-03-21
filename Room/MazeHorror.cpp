@@ -74,8 +74,8 @@ int k = 1;
 
 int count = 0;
 
-float wall_width = 0.5;
-float wall_height = 3;
+constexpr float wall_width = 0.5;
+constexpr float wall_height = 3;
 
 char** field = nullptr;
 
@@ -379,7 +379,7 @@ void draw_cuboid(const Maniac& maniac, float xr, float yr, float zr,
 	glEnd();
 }
 
-void DrawManiac(const Maniac& maniac, const Player& player)
+void Maniac_Draw(const Maniac& maniac, const Player& player)
 {
 	const float Sx = maniac.entity.object.position.x - player.entity.object.position.x;
 	const float Sy = player.entity.object.position.y - maniac.entity.object.position.y;
@@ -479,8 +479,7 @@ void render(Player& player)
 
 	glRotatef(player.entity.viewDirectionAngle, 0, 1, 0);
 
-	DrawManiac(maniac, player);
-	float S = vec2d_Dist(maniac.entity.object.position, maniac.entity.object.position);
+	Maniac_Draw(maniac, player);
 	
 	Maniac_Move(maniac, player.entity.object.position);
 
@@ -737,15 +736,20 @@ int SDL_main(int argc, char ** argv) {
 #else
 	srand(time(NULL));
 #endif
-	Maze maze(31, 31);
+	const Maze maze(map_width, map_height);
 	Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048);
 
 	soundScary = Mix_LoadWAV(SOUND_SCARY);
 	soundKrik = Mix_LoadWAV(SOUND_KRIK);
 	soundBenzopila = Mix_LoadWAV(SOUND_BENZOPILA);
 
-	Mix_VolumeChunk(soundScary, 32);
+	Mix_VolumeChunk(soundScary, MIX_MAX_VOLUME / 2);
+	Mix_VolumeChunk(soundKrik, MIX_MAX_VOLUME / 64);
+	Mix_VolumeChunk(soundKrik, MIX_MAX_VOLUME / 64);
+
 	const int maniacMusicChannel = Mix_PlayChannel(-1, soundScary, -1);
+
+	maze.print();
 
 	field = new char*[maze.height()];
 	for (size_t i = 0; i < maze.height(); i++) {
@@ -759,14 +763,13 @@ int SDL_main(int argc, char ** argv) {
 
 	do {
 		player_position = RandomPosition(maze);
-	} while (field[player_position.first][player_position.second] == Maze::WALL);
+	} while (field[player_position.first][player_position.second] == Maze::WALL 
+		|| (player_position.first == static_cast<size_t>(maniac.entity.object.position.y)
+			&& player_position.second == static_cast<size_t>(maniac.entity.object.position.x))
+	);
 
-	maze.print();
-
-	player.entity.object.position.y = player_position.first-0.5;
-	player.entity.object.position.x = player_position.second+0.5;
-	wall_height = maze.width();
-	wall_width = maze.height();
+	player.entity.object.position.y = static_cast<float>(player_position.first)-0.5f;
+	player.entity.object.position.x = static_cast<float>(player_position.second)+0.5f;
 
 	int screen_width = 1280;
 	int screen_height = 960;
@@ -791,7 +794,7 @@ int SDL_main(int argc, char ** argv) {
 		
 		Mix_SetPosition(maniacMusicChannel,
 			std::atan2(maniac.entity.object.position.y- player.entity.object.position.y,
-				maniac.entity.object.position.x - maniac.entity.object.position.x),
+				maniac.entity.object.position.x - player.entity.object.position.x),
 			maniacSoundDistance);
 
 		render(player);
